@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.1
+#  Version       3.0.2
 #  Created       2026-10-06
 #  Last updated  2026-10-12
 #  License       MIT (see LICENSE)
@@ -24,6 +24,8 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.0.2  2026-10-12  Uses the shared AAU server databases (/databases/GTDB, /databases/bakta,
+#                       /databases/checkm2) by default; finds the database folder inside them
 #    3.0.1  2026-10-12  Setup: SHARED_*_DB settings to reuse server databases; finds GTDB-Tk
 #                       data inside the conda env; removes half-downloaded Bakta files
 #    3.0.0  2026-10-12  Single self-contained script; GToTree, GECCO, BiG-SCAPE and
@@ -51,12 +53,15 @@ FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb
 POLISH=1                       # 1 = polish with Medaka (--bacteria model), 0 = skip
 BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)
 
-# Databases that ALREADY EXIST on your server (shared copies). Fill in a path to use it
-# instead of downloading your own; leave empty ("") to let "setup" download it.
-# Ask your server admins or look in e.g. /databases or /shared before downloading 100+ GB.
-SHARED_GTDBTK_DB=""            # folder that contains taxonomy/, markers/, ... (must match the GTDB-Tk version)
-SHARED_BAKTA_DB=""             # folder that contains bakta.db (e.g. .../db-light or .../db)
-SHARED_CHECKM2_DB=""           # the CheckM2 .dmnd file, or the folder that contains it
+# Databases that ALREADY EXIST on the server (shared copies), so "setup" does not have to
+# download them. The defaults below are the AAU bio-server locations. The script searches
+# inside each folder for the actual database, so pointing at the top folder is enough.
+# On another server: change the paths, or set "" to let "setup" download the database.
+# If a path does not exist, the script falls back to its own downloaded copy.
+SHARED_GTDBTK_DB="/databases/GTDB/gtdbtk_packages/GTDB-TK_release232_2026_04_15"
+                               # GTDB-Tk 2.7.x needs release 232; an older GTDB-Tk needs an older release
+SHARED_BAKTA_DB="/databases/bakta"
+SHARED_CHECKM2_DB="/databases/checkm2"
 
 # Optional programs (1 = run, 0 = skip)
 RUN_GECCO=1                    # machine-learning BGC detection
@@ -98,7 +103,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.1"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.0.2"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-12"
 
 
@@ -122,27 +127,48 @@ CHECKM2_DB="$DB_DIR/checkm2"
 CARD_DB="$DB_DIR/card"
 GTDBTK_DB="$DB_DIR/gtdbtk"
 
-# Use shared server copies when given in the settings
-[[ -n "$SHARED_GTDBTK_DB"  ]] && GTDBTK_DB=$SHARED_GTDBTK_DB
-[[ -n "$SHARED_CHECKM2_DB" ]] && CHECKM2_DB=$SHARED_CHECKM2_DB
+# ---------- locating the databases (shared server copy first, then our own) ----------
+# find_db_dir TOP NAME : the folder below TOP that contains NAME (a file or folder that
+# marks the database), e.g. bakta.db or taxonomy/. Prints nothing if not found.
+find_db_dir() {
+  [[ -n "$1" && -e "$1" ]] || return 0
+  local hit
+  hit=$(find -L "$1" -maxdepth 4 -name "$2" 2>/dev/null | sort | head -n 1)
+  [[ -n "$hit" ]] && dirname "$hit"
+  return 0
+}
 
-# Bakta database folder: shared copy, else our own db-light / db
+# Bakta: the folder that contains bakta.db. Prefers the full database ("db") over "db-light".
 bakta_db_path() {
-  if [[ -n "$SHARED_BAKTA_DB" ]]; then echo "$SHARED_BAKTA_DB"; return; fi
-  local d
-  for d in "$BAKTA_DB_PARENT/db-$BAKTA_DB_TYPE" "$BAKTA_DB_PARENT/db-light" "$BAKTA_DB_PARENT/db"; do
-    [[ -f "$d/bakta.db" ]] && { echo "$d"; return; }
+  local top d
+  for top in "$SHARED_BAKTA_DB" "$BAKTA_DB_PARENT"; do
+    [[ -n "$top" && -e "$top" ]] || continue
+    d=$(find -L "$top" -maxdepth 4 -name bakta.db 2>/dev/null | sort \
+        | awk '{n=split($0,a,"/"); print (a[n-1]=="db" ? 0 : 1) "\t" $0}' | sort | head -n 1 | cut -f2)
+    [[ -n "$d" ]] && { dirname "$d"; return; }
   done
   echo "$BAKTA_DB_PARENT/db-$BAKTA_DB_TYPE"
 }
 
-# GTDB-Tk database folder. Newer GTDB-Tk versions' download-db.sh ignores the target folder
-# and unpacks into the conda env (envs/gtdbtk/share/gtdbtk-*/db), so look there as well.
+# GTDB-Tk: the folder that contains taxonomy/. Also checks inside the conda env, because
+# newer GTDB-Tk versions' download-db.sh unpacks there instead of the folder it is given.
 gtdbtk_db_path() {
-  if [[ -d "$GTDBTK_DB/taxonomy" ]]; then echo "$GTDBTK_DB"; return; fi
-  local d
-  d=$(find "$ENV_DIR/gtdbtk/share" -maxdepth 3 -type d -name taxonomy 2>/dev/null | head -n 1)
-  if [[ -n "$d" ]]; then dirname "$d"; else echo "$GTDBTK_DB"; fi
+  local d top
+  for top in "$SHARED_GTDBTK_DB" "$GTDBTK_DB" "$ENV_DIR/gtdbtk/share"; do
+    d=$(find_db_dir "$top" taxonomy)
+    [[ -n "$d" ]] && { echo "$d"; return; }
+  done
+  echo "$GTDBTK_DB"
+}
+
+# CheckM2: the .dmnd file
+checkm2_dmnd() {
+  local top hit
+  for top in "$SHARED_CHECKM2_DB" "$CHECKM2_DB"; do
+    [[ -n "$top" && -e "$top" ]] || continue
+    hit=$(find -L "$top" -maxdepth 4 -name '*.dmnd' 2>/dev/null | sort | head -n 1)
+    [[ -n "$hit" ]] && { echo "$hit"; return; }
+  done
 }
 
 [[ -n "${SLURM_CPUS_PER_TASK:-}" ]] && THREADS=$SLURM_CPUS_PER_TASK
@@ -320,7 +346,7 @@ step_quast() {
 # 06 CheckM2 — completeness (>95 % good) and contamination (<5 % good; high = mixed culture?)
 step_checkm2() {
   local dmnd
-  dmnd=$(find "$CHECKM2_DB" -name '*.dmnd' 2>/dev/null | head -n 1)
+  dmnd=$(checkm2_dmnd)
   [[ -n "$dmnd" || $DRY_RUN -eq 1 ]] || { log "    CheckM2 database missing — run: setup"; return 1; }
   run_in_env checkm2 checkm2 predict --threads "$THREADS" --input "$GENOME" \
     --output-directory "$SD/06_checkm2" --database_path "${dmnd:-CheckM2.dmnd}" --force
@@ -502,21 +528,23 @@ do_setup() {
       || { warn "antiSMASH databases FAILED"; fail=1; }
   else log "  antiSMASH: present"; fi
 
-  if [[ -n "$SHARED_BAKTA_DB" ]]; then log "  Bakta: using shared copy $SHARED_BAKTA_DB"
-  elif [[ ! -f "$(bakta_db_path)/bakta.db" ]]; then
+  if [[ -f "$(bakta_db_path)/bakta.db" ]]; then log "  Bakta: present ($(bakta_db_path))"
+  else
+    [[ -n "$SHARED_BAKTA_DB" ]] && warn "  no Bakta database found in $SHARED_BAKTA_DB — downloading our own"
     mkdir -p "$BAKTA_DB_PARENT"
     # a half-finished download from an earlier attempt fails the MD5 check -> remove it first
     rm -f "$BAKTA_DB_PARENT"/*.tar.xz "$BAKTA_DB_PARENT"/*.tar.gz
     run_in_env bakta bakta_db download --output "$BAKTA_DB_PARENT" --type "$BAKTA_DB_TYPE" \
       || { warn "Bakta database FAILED (slow or blocked connection to zenodo.org?)"; fail=1; }
-  else log "  Bakta: present"; fi
+  fi
 
-  if [[ -n "$SHARED_CHECKM2_DB" ]]; then log "  CheckM2: using shared copy $SHARED_CHECKM2_DB"
-  elif ! find "$CHECKM2_DB" -name '*.dmnd' 2>/dev/null | grep -q .; then
+  if [[ -n "$(checkm2_dmnd)" ]]; then log "  CheckM2: present ($(checkm2_dmnd))"
+  else
+    [[ -n "$SHARED_CHECKM2_DB" ]] && warn "  no CheckM2 database found in $SHARED_CHECKM2_DB — downloading our own"
     mkdir -p "$CHECKM2_DB"
     run_in_env checkm2 checkm2 database --download --path "$CHECKM2_DB" \
       || { warn "CheckM2 database FAILED (slow or blocked connection to zenodo.org?)"; fail=1; }
-  else log "  CheckM2: present"; fi
+  fi
 
   if [[ ! -d "$CARD_DB/localDB" ]]; then
     mkdir -p "$CARD_DB"
@@ -526,12 +554,13 @@ do_setup() {
   else log "  CARD: present"; fi
 
   if [[ $RUN_GTDBTK -eq 1 ]]; then
-    if [[ -n "$SHARED_GTDBTK_DB" ]]; then log "  GTDB-Tk: using shared copy $SHARED_GTDBTK_DB"
-    elif [[ ! -d "$(gtdbtk_db_path)/taxonomy" ]]; then
+    if [[ -d "$(gtdbtk_db_path)/taxonomy" ]]; then log "  GTDB-Tk: present ($(gtdbtk_db_path))"
+    else
+      [[ -n "$SHARED_GTDBTK_DB" ]] && warn "  no GTDB-Tk database found in $SHARED_GTDBTK_DB — downloading our own"
       mkdir -p "$GTDBTK_DB"
       run_in_env gtdbtk bash -c 'export GTDBTK_DATA_PATH="$1"; download-db.sh "$1"' _ "$GTDBTK_DB" \
         || { warn "GTDB-Tk database FAILED (no connection to data.gtdb.ecogenomic.org?) — set SHARED_GTDBTK_DB or RUN_GTDBTK=0"; fail=1; }
-    else log "  GTDB-Tk: present ($(gtdbtk_db_path))"; fi
+    fi
   fi
 
   if [[ $fail -eq 0 ]]; then

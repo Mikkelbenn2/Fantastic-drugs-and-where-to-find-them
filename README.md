@@ -156,6 +156,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `FLYE_READ_MODE` | `nano-hq` | Your reads are old R9.4.1 or fast-basecalled data: use `nano-raw` |
 | `GENOME_SIZE` | empty | You know it, e.g. `8m` for *Streptomyces* |
 | `FILTLONG_TARGET_BASES` | empty | Coverage is very deep (> 150x): cap it at about 100 × genome size |
+| `SHARED_GTDBTK_DB`, `SHARED_BAKTA_DB`, `SHARED_CHECKM2_DB` | AAU server: `/databases/...` | You are on another server: point them at its shared databases, or set `""` to let `setup` download them |
 | `POLISH` | 1 | Set to 0 to skip Medaka |
 | `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
 | `GTOTREE_HMM` | `Bacteria` | All isolates are actinomycetes: use `Actinobacteria` |
@@ -188,7 +189,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Time per isolate | ~2–4 hours with 16 CPUs (Flye and antiSMASH take the longest) |
 | Memory | 32–64 GB per isolate; GTDB-Tk needs ~64–100 GB |
 
-Run `setup` on a login node with internet access, because compute nodes often have none.
+On the AAU bio-server, GTDB-Tk, Bakta and CheckM2 are already in `/databases` and are used automatically, so `setup` only downloads antiSMASH and CARD. Elsewhere, run `setup` on a login node with internet access, because compute nodes often have none.
 
 ---
 
