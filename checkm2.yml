@@ -1,9 +1,0 @@
-# Conda environment for: checkm2
-# Created by bin/setup_envs.sh. Minimum versions are given; the exact versions
-# installed are written to <OUTDIR>/logs/software_versions.tsv at every run.
-name: checkm2
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - checkm2>=1.0.2

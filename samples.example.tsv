@@ -1,4 +1,0 @@
-sample_id	reads	genome_size
-TE_isolate01	/path/to/fastq_pass/barcode01	8m
-TE_isolate02	/path/to/reads/TE_isolate02.fastq.gz
-TE_isolate03	/path/to/fastq_pass/barcode03

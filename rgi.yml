@@ -1,9 +1,0 @@
-# Conda environment for: rgi
-# Created by bin/setup_envs.sh. Minimum versions are given; the exact versions
-# installed are written to <OUTDIR>/logs/software_versions.tsv at every run.
-name: rgi
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - rgi>=6.0

@@ -1,9 +1,0 @@
-# Conda environment for: bigscape
-# Created by bin/setup_envs.sh. Minimum versions are given; the exact versions
-# installed are written to <OUTDIR>/logs/software_versions.tsv at every run.
-name: bigscape
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - bigscape>=2.0

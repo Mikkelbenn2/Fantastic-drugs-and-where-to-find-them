@@ -1,24 +1,13 @@
-# Never commit data or results to git: they are large and may not be yours to share.
-results/
-*.fastq
-*.fastq.gz
-*.fq.gz
-*.fasta
-*.fna
-*.bam
-*.bai
-*.pod5
+# Data, results, programs and databases never go into git (large, and not always ours to share).
+# The empty folders are kept with .gitkeep files so the folder structure exists after cloning.
+raw_data/*
+!raw_data/.gitkeep
+results/*
+!results/.gitkeep
+setup/envs/
+setup/databases/
+setup/*.log
 
-# Your own project configs/sample sheets (paths are server-specific).
-# Commit them deliberately if you want them versioned: git add -f config/my_project.sh
-config/*.sh
-!config/config.example.sh
-config/*.tsv
-!config/samples.example.tsv
-
-# Local environments, databases, OS clutter
-.envs/
-databases/
+# OS clutter
 .DS_Store
 __pycache__/
-*.pyc

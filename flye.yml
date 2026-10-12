@@ -1,9 +1,0 @@
-# Conda environment for: flye
-# Created by bin/setup_envs.sh. Minimum versions are given; the exact versions
-# installed are written to <OUTDIR>/logs/software_versions.tsv at every run.
-name: flye
-channels:
-  - conda-forge
-  - bioconda
-dependencies:
-  - flye>=2.9.5
