@@ -1,4 +1,4 @@
-# BGC screening pipeline
+# Fantastic drugs and where to find them 🧪🌱
 
 **From Oxford Nanopore reads of soil isolates to a ranked list of novel antimicrobial gene clusters.**
 
@@ -46,8 +46,8 @@ The pipeline was built for the Tiny Earth soil isolates in our 7th-semester proj
 
 ```bash
 # 1. Get the pipeline (the folders raw_data/, setup/ and results/ are already in the repository)
-git clone https://github.com/Mikkelbenn2/ont-bgc-mining.git
-cd ont-bgc-mining
+git clone https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them.git
+cd Fantastic-drugs-and-where-to-find-them
 
 # 2. Install all programs and databases (once per server, Note this takes hours, due to the GTDB-tK database being large; run inside tmux)
 tmux new -s setup
@@ -72,7 +72,7 @@ You need `conda`, `mamba` or `micromamba` on your PATH (on many servers: `module
 ## Folder layout
 
 ```
-ont-bgc-mining/
+Fantastic-drugs-and-where-to-find-them/
 ├── README.md
 ├── raw_data/                  ← your reads
 │   ├── isolate1.fastq.gz         one file per isolate, or
@@ -232,10 +232,10 @@ Check page numbers and DOIs against the original papers before they go into a re
 | **Version** | 3.0.0 (last updated 2026-10-12) |
 | **License** | MIT (see `LICENSE`) |
 
-**AI assistance.** This pipeline was developed with help from Claude (Anthropic), an AI assistant. It was used to draft and test the code, to choose and compare tools, and to write the documentation. The author decided the design, reviewed the code and is responsible for how it is used and for the results it produces.
+**AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.0.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/ont-bgc-mining
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.0.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

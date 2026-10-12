@@ -20,7 +20,7 @@
 #  How to cite
 #    Bennetsen M. (2026). bgc_pipeline.sh v3.0.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
-#    https://github.com/Mikkelbenn2/ont-bgc-mining
+#    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
@@ -814,7 +814,7 @@ case "$CMD" in
     [[ $DRY_RUN -eq 0 ]] && mkdir -p "$RESULTS_DIR/logs"
     MAIN_LOG="$RESULTS_DIR/logs/pipeline_$(date +%Y%m%d_%H%M%S)_$$.log"
     [[ $DRY_RUN -eq 1 ]] && MAIN_LOG=/dev/null
-    log "bgc_pipeline.sh v$PIPELINE_VERSION ($PIPELINE_UPDATED) — Mikkel Bennetsen, AAU — github.com/Mikkelbenn2/ont-bgc-mining"
+    log "bgc_pipeline.sh v$PIPELINE_VERSION ($PIPELINE_UPDATED) — Mikkel Bennetsen, AAU — github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them"
     log "Project: $PROJECT_DIR | isolates: ${#SAMPLES[@]} | threads: $THREADS | dry run: $DRY_RUN"
     [[ $DRY_RUN -eq 0 ]] && write_versions
     FAILED=()
