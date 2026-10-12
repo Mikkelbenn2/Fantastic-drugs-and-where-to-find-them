@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.2
+#  Version       3.0.3
 #  Created       2026-10-06
 #  Last updated  2026-10-12
 #  License       MIT (see LICENSE)
@@ -24,6 +24,7 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.0.3  2026-10-12  Comment listing the AAU BioCloud database folders and GTDB releases.
 #    3.0.2  2026-10-12  Uses the shared AAU server databases (/databases/GTDB, /databases/bakta,
 #                       /databases/checkm2) by default; finds the database folder inside them
 #    3.0.1  2026-10-12  Setup: SHARED_*_DB settings to reuse server databases; finds GTDB-Tk
@@ -54,10 +55,28 @@ POLISH=1                       # 1 = polish with Medaka (--bacteria model), 0 = 
 BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)
 
 # Databases that ALREADY EXIST on the server (shared copies), so "setup" does not have to
-# download them. The defaults below are the AAU bio-server locations. The script searches
-# inside each folder for the actual database, so pointing at the top folder is enough.
-# On another server: change the paths, or set "" to let "setup" download the database.
-# If a path does not exist, the script falls back to its own downloaded copy.
+# download them. The script searches inside each folder for the actual database, so pointing
+# at the top folder is enough. If a path does not exist, the script falls back to its own
+# downloaded copy. On another server: change the paths, or set "" to let "setup" download it.
+#
+# ---- AAU BioCloud server ----------------------------------------------------------------
+# If you are on the AAU BioCloud server, these database folders already exist and can be used
+# (the defaults below already point to them):
+#   Bakta     /databases/bakta
+#   CheckM2   /databases/checkm2
+#             /databases/checkm2/CheckM2_database          (the .dmnd file is in here)
+#   GTDB      /databases/GTDB
+#             /databases/GTDB/gtdb_data
+#             /databases/GTDB/gtdbtk_packages               (one folder per GTDB release):
+#               GTDB-TK_release207_2022_05_10   -> GTDB-Tk 2.1.x
+#               GTDB-TK_release214_2023_04_27   -> GTDB-Tk 2.3.x
+#               GTDB-TK_release220_2024_04_18   -> GTDB-Tk 2.4.x
+#               GTDB-TK_release226_2025_04_11   -> GTDB-Tk 2.5.x
+#               GTDB-TK_release232_2026_04_15   -> GTDB-Tk 2.7.x  (used by this pipeline)
+# The GTDB release MUST match the GTDB-Tk version, otherwise GTDB-Tk stops with an error
+# (version pairs from the GTDB-Tk docs: ecogenomics.github.io/GTDBTk).
+# Check your version with:  conda run -p setup/envs/gtdbtk gtdbtk --version
+# -------------------------------------------------------------------------------------------
 SHARED_GTDBTK_DB="/databases/GTDB/gtdbtk_packages/GTDB-TK_release232_2026_04_15"
                                # GTDB-Tk 2.7.x needs release 232; an older GTDB-Tk needs an older release
 SHARED_BAKTA_DB="/databases/bakta"
@@ -103,7 +122,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.2"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.0.3"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-12"
 
 
