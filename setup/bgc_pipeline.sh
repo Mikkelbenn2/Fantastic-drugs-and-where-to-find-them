@@ -12,10 +12,10 @@
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
-#    This pipeline was developed with help from Claude (Anthropic), an AI
-#    assistant. It was used to draft and test the code, choose and compare tools,
-#    and write the documentation. The author decided the design, reviewed the
-#    code and is responsible for how it is used and for the results it produces.
+#    This pipeline was developed with help from Claude (Anthropic).
+#    It was used to draft and test the code, helped select and compare tools,
+#    and helped write the documentation. The author decided the design, reviewed the code, and 
+#    tweaked the parameters.
 #
 #  How to cite
 #    Bennetsen M. (2026). bgc_pipeline.sh v3.0.0 — a Nanopore pipeline for
@@ -27,7 +27,7 @@
 #    3.0.0  2026-10-12  Single self-contained script; GToTree, GECCO, BiG-SCAPE and
 #                       ranked novelty summary; Slurm job array; README + flowchart
 #    2.0.0  2026-10-06  Multi-file version (config + sample sheet)
-#    1.0.0  2026-09-11  First version: NanoPlot -> Flye -> antiSMASH -> RGI
+#    1.0.0  2026-09-11  First version: NanoPlot -> Flye -> antiSMASH -> RGI -> CARD
 #
 #  Usage
 #    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
