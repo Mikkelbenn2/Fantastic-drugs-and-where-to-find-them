@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.4
+#  Version       3.0.5
 #  Created       2026-10-06
 #  Last updated  2026-10-12
 #  License       MIT (see LICENSE)
@@ -24,6 +24,8 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.0.5  2026-10-12  Bakta: skips databases too old for Bakta >= 1.10 (no "type" key in
+#                       version.json) and downloads its own copy in setup instead.
 #    3.0.4  2026-10-12  Medaka: MEDAKA_MODEL setting; falls back to the bacterial R10.4.1 model
 #                       when --bacteria fails (reads from SRA have no model info in headers).
 #    3.0.3  2026-10-12  Comment listing the AAU BioCloud database folders and GTDB releases.
@@ -70,7 +72,8 @@ BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; o
 # ---- AAU BioCloud server ----------------------------------------------------------------
 # If you are on the AAU BioCloud server, these database folders already exist and can be used
 # (the defaults below already point to them):
-#   Bakta     /databases/bakta
+#   Bakta     /databases/bakta   (NOTE: the 2022 database here is too old for Bakta >= 1.10;
+#                                  the script skips it and "setup" downloads its own copy)
 #   CheckM2   /databases/checkm2
 #             /databases/checkm2/CheckM2_database          (the .dmnd file is in here)
 #   GTDB      /databases/GTDB
@@ -130,7 +133,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.4"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.0.5"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-12"
 
 
@@ -165,14 +168,20 @@ find_db_dir() {
   return 0
 }
 
-# Bakta: the folder that contains bakta.db. Prefers the full database ("db") over "db-light".
+# Bakta: the folder that contains bakta.db. Only databases that fit Bakta >= 1.10 are used
+# (schema v5/v6: their version.json has a "type" key). Older ones, e.g. the 2022 database
+# (schema v4), stop Bakta with "Missed key 'type'", so they are skipped.
+# Among the usable ones: full ("db") before light ("db-light"), then the newest folder.
+bakta_db_ok() { [[ -f "$1/bakta.db" && -f "$1/version.json" ]] && grep -q '"type"' "$1/version.json"; }
 bakta_db_path() {
-  local top d
+  local top d best
   for top in "$SHARED_BAKTA_DB" "$BAKTA_DB_PARENT"; do
     [[ -n "$top" && -e "$top" ]] || continue
-    d=$(find -L "$top" -maxdepth 4 -name bakta.db 2>/dev/null | sort \
-        | awk '{n=split($0,a,"/"); print (a[n-1]=="db" ? 0 : 1) "\t" $0}' | sort | head -n 1 | cut -f2)
-    [[ -n "$d" ]] && { dirname "$d"; return; }
+    best=$(find -L "$top" -maxdepth 4 -name bakta.db 2>/dev/null | while read -r d; do
+             d=$(dirname "$d"); bakta_db_ok "$d" || continue
+             printf '%s\t%s\n' "$([[ $(basename "$d") == db ]] && echo 0 || echo 1)" "$d"
+           done | sort -k1,1n -k2,2r | head -n 1 | cut -f2)
+    [[ -n "$best" ]] && { echo "$best"; return; }
   done
   echo "$BAKTA_DB_PARENT/db-$BAKTA_DB_TYPE"
 }
@@ -568,9 +577,9 @@ do_setup() {
       || { warn "antiSMASH databases FAILED"; fail=1; }
   else log "  antiSMASH: present"; fi
 
-  if [[ -f "$(bakta_db_path)/bakta.db" ]]; then log "  Bakta: present ($(bakta_db_path))"
+  if bakta_db_ok "$(bakta_db_path)"; then log "  Bakta: present ($(bakta_db_path))"
   else
-    [[ -n "$SHARED_BAKTA_DB" ]] && warn "  no Bakta database found in $SHARED_BAKTA_DB — downloading our own"
+    [[ -n "$SHARED_BAKTA_DB" ]] && warn "  no Bakta database for Bakta >= 1.10 in $SHARED_BAKTA_DB (too old or missing) — downloading our own"
     mkdir -p "$BAKTA_DB_PARENT"
     # a half-finished download from an earlier attempt fails the MD5 check -> remove it first
     rm -f "$BAKTA_DB_PARENT"/*.tar.xz "$BAKTA_DB_PARENT"/*.tar.gz
