@@ -5,7 +5,7 @@
 #
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
-#  Repository    https://github.com/Mikkelbenn2/ont-bgc-mining
+#  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #  Version       3.0.0
 #  Created       2026-10-06
 #  Last updated  2026-10-12
