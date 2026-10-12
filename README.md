@@ -19,36 +19,6 @@ The pipeline was built for the Tiny Earth soil isolates in our 7th-semester proj
 
 ![BGC screening pipeline flowchart](flowchart.png)
 
-> To show the figure above, download the flowchart from Canva: open the design, then **Share → Download → PNG**. Save it as `flowchart.png` in the same folder as this README.
-
-<details>
-<summary>Text version of the flowchart</summary>
-
-```mermaid
-flowchart TD
-  A[Oxford Nanopore reads<br/>FASTQ] --> B[NanoPlot<br/>read quality control]
-  B --> C[Filtlong<br/>remove short / low-quality reads]
-  C --> D[Flye<br/>genome assembly]
-  D --> E[Medaka<br/>polishing]
-  E --> F[QUAST<br/>assembly statistics]
-  E --> G[CheckM2<br/>completeness & contamination]
-  F --> H[Bakta<br/>gene annotation]
-  G --> H
-  H --> I[antiSMASH<br/>BGC detection + MIBiG comparison]
-  H --> J[GECCO<br/>machine-learning BGC detection]
-  H --> K[RGI / CARD<br/>resistance genes]
-  E --> L[GTDB-Tk<br/>species identification]
-  L --> M[GToTree<br/>phylogeny]
-  I --> N[BiG-SCAPE<br/>BGC families vs. MIBiG]
-  I --> O[Ranked list of novel BGC candidates<br/>novel / related / known]
-  J --> O
-  K --> O
-  L --> O
-  N --> O
-```
-
-</details>
-
 ---
 
 ## What each step does
