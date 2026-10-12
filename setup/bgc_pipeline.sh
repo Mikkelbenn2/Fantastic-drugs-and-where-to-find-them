@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.5
+#  Version       3.0.6
 #  Created       2026-10-06
 #  Last updated  2026-10-12
 #  License       MIT (see LICENSE)
@@ -24,6 +24,7 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.0.6  2026-10-12  QUAST env pinned to Python 3.11 (QUAST needs distutils, gone in 3.12+).
 #    3.0.5  2026-10-12  Bakta: skips databases too old for Bakta >= 1.10 (no "type" key in
 #                       version.json) and downloads its own copy in setup instead.
 #    3.0.4  2026-10-12  Medaka: MEDAKA_MODEL setting; falls back to the bacterial R10.4.1 model
@@ -121,7 +122,7 @@ declare -A ENV_PACKAGES=(
   [reads]="nanoplot>=1.42 filtlong>=0.2.1 seqkit>=2.8"
   [flye]="flye>=2.9.5"
   [medaka]="medaka>=2.0 samtools>=1.20"
-  [quast]="quast>=5.2"
+  [quast]="quast>=5.2 python=3.11"   # QUAST still imports distutils, which Python 3.12+ removed
   [checkm2]="checkm2>=1.0.2"
   [bakta]="bakta>=1.10"
   [antismash]="antismash>=8.0"
@@ -133,7 +134,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.5"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.0.6"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-12"
 
 
