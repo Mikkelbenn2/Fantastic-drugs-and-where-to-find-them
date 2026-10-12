@@ -1,64 +1,6 @@
-#!/usr/bin/env bash
 # =============================================================================
 #  bgc_pipeline.sh — ONT genomes of soil isolates -> screen for NOVEL antimicrobial BGCs
 #  P7 project (AAU). One self-contained script: paste it into  setup/bgc_pipeline.sh
-# =============================================================================
-#
-#  FOLDER LAYOUT (the script finds everything relative to its own location)
-#
-#    my_project/
-#    ├── raw_data/          <- put reads here: one FASTQ(.gz) file per isolate,
-#    │                         OR one folder per isolate (e.g. barcode01/ with many fastq.gz)
-#    ├── setup/
-#    │   ├── bgc_pipeline.sh   <- THIS script
-#    │   ├── envs/             (created) one conda environment per program
-#    │   └── databases/        (created) antiSMASH, Bakta, CheckM2, CARD, GTDB-Tk
-#    └── results/           (created)
-#        ├── <isolate_1>/
-#        │   ├── 01_nanoplot/   read quality              (NanoPlot)
-#        │   ├── 02_filtlong/   read filtering            (Filtlong + SeqKit)
-#        │   ├── 03_flye/       genome assembly           (Flye)
-#        │   ├── 04_medaka/     polishing                 (Medaka)
-#        │   ├── 05_quast/      assembly quality          (QUAST)
-#        │   ├── 06_checkm2/    completeness/contamination(CheckM2)
-#        │   ├── 07_bakta/      gene annotation           (Bakta)
-#        │   ├── 08_antismash/  BGC detection + MIBiG     (antiSMASH)
-#        │   ├── 09_gecco/      BGC detection, ML         (GECCO)
-#        │   ├── 10_rgi_card/   resistance genes          (RGI + CARD)
-#        │   ├── 11_gtdbtk/     species identification    (copied from the combined GTDB-Tk run)
-#        │   ├── 12_novelty/    THIS isolate's BGCs ranked by novelty
-#        │   └── logs/          one log per program (exact command + all tool output)
-#        ├── <isolate_2>/ ...
-#        └── _combined/      steps that compare all isolates at once
-#            ├── gtdbtk/     species identification   (GTDB-Tk)
-#            ├── gtotree/    phylogeny                (GToTree)
-#            ├── bigscape/   BGC families vs. MIBiG   (BiG-SCAPE)
-#            └── summary/    genome_summary.tsv + bgc_summary.tsv (ALL BGCs, ranked)
-#
-#  USAGE (run from anywhere)
-#    bash setup/bgc_pipeline.sh setup            # once: install programs + download databases
-#    bash setup/bgc_pipeline.sh list             # show which isolates were found in raw_data/
-#    bash setup/bgc_pipeline.sh run --dry-run    # print every command, run nothing
-#    bash setup/bgc_pipeline.sh run              # run everything here, isolate by isolate
-#    bash setup/bgc_pipeline.sh submit           # Slurm: one job per isolate + one combined job
-#
-#  OPTIONS for run
-#    --sample NAME     only this isolate          --force STEP   redo a step (e.g. 08_antismash, or all)
-#    --dry-run         only print the commands    --no-combined  skip the combined steps
-#
-#  Re-running is safe: finished steps are skipped (logs/<step>.done). After a crash,
-#  just start it again. Delete results/<isolate>/ to start that isolate from scratch.
-#
-#  HOW NOVELTY IS SCREENED (results/_combined/summary/bgc_summary.tsv)
-#    1. antiSMASH KnownClusterBlast: % similarity to the closest characterised BGC in MIBiG
-#         >= 80 % "known" | 30-79 % "related" | < 30 % or no hit "novel_candidate"
-#    2. BiG-SCAPE: does the BGC fall in a gene-cluster family together with a MIBiG BGC?
-#    3. GECCO (machine learning) independently detects the same region -> better supported
-#    4. RGI: a resistance gene INSIDE the BGC = possible self-resistance gene -> likely antibiotic
-#    5. Class: NRPS / PKS / RiPP (the classes behind most clinical antibiotics)
-#    6. GTDB-Tk: isolate without a species match = possible new species (reported per genome)
-#    Priority score = novel +3 / related +1, NRPS-PKS-RiPP +2, GECCO +1, resistance gene +2,
-#    on contig edge -1. It ranks what to inspect first in antiSMASH; it does not prove activity.
 # =============================================================================
 
 # ============================== SETTINGS =====================================
