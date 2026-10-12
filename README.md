@@ -49,7 +49,8 @@ The pipeline was built for the Tiny Earth soil isolates in our 7th-semester proj
 git clone https://github.com/Mikkelbenn2/ont-bgc-mining.git
 cd ont-bgc-mining
 
-# 2. Install all programs and databases (once per server, takes hours; run inside tmux)
+# 2. Install all programs and databases (once per server, Note this takes hours, due to the GTDB-tK database being large; run inside tmux)
+tmux new -s setup
 bash setup/bgc_pipeline.sh setup
 
 # 3. Put the reads in raw_data/ and check that they are found
