@@ -1,6 +1,37 @@
+#!/usr/bin/env bash
 # =============================================================================
 #  bgc_pipeline.sh — ONT genomes of soil isolates -> screen for NOVEL antimicrobial BGCs
-#  P7 project (AAU). One self-contained script: paste it into  setup/bgc_pipeline.sh
+# =============================================================================
+#
+#  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
+#                Aalborg University (AAU), 7th-semester project (P7), 2026
+#  Repository    https://github.com/Mikkelbenn2/ont-bgc-mining
+#  Version       3.0.0
+#  Created       2026-10-06
+#  Last updated  2026-10-12
+#  License       MIT (see LICENSE)
+#
+#  AI assistance
+#    This pipeline was developed with help from Claude (Anthropic), an AI
+#    assistant. It was used to draft and test the code, choose and compare tools,
+#    and write the documentation. The author decided the design, reviewed the
+#    code and is responsible for how it is used and for the results it produces.
+#
+#  How to cite
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.0.0 — a Nanopore pipeline for
+#    screening soil isolates for novel biosynthetic gene clusters.
+#    https://github.com/Mikkelbenn2/ont-bgc-mining
+#    Please also cite the individual programs it runs (see README.md).
+#
+#  Changelog
+#    3.0.0  2026-10-12  Single self-contained script; GToTree, GECCO, BiG-SCAPE and
+#                       ranked novelty summary; Slurm job array; README + flowchart
+#    2.0.0  2026-10-06  Multi-file version (config + sample sheet)
+#    1.0.0  2026-09-11  First version: NanoPlot -> Flye -> antiSMASH -> RGI
+#
+#  Usage
+#    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
+#    Full instructions: README.md
 # =============================================================================
 
 # ============================== SETTINGS =====================================
@@ -57,6 +88,9 @@ declare -A ENV_PACKAGES=(
   [bigscape]="bigscape>=2.0"
 )
 # =========================== END OF SETTINGS =================================
+
+PIPELINE_VERSION="3.0.0"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-10-12"
 
 
 set -uo pipefail
@@ -751,7 +785,10 @@ PYTHON
 # =============================================================================
 #  MAIN
 # =============================================================================
-usage() { sed -n '3,61p' "$SCRIPT_PATH" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() {   # prints the comment block at the top of this file (up to SETTINGS)
+  sed -n '3,/^# =* SETTINGS/p' "$SCRIPT_PATH" | sed '$d' | sed 's/^# \{0,1\}//'
+  exit "${1:-0}"
+}
 
 CMD=${1:-help}; shift || true
 ONLY=""; ARRAY_TASK=0; DO_COMBINED=1
@@ -777,6 +814,7 @@ case "$CMD" in
     [[ $DRY_RUN -eq 0 ]] && mkdir -p "$RESULTS_DIR/logs"
     MAIN_LOG="$RESULTS_DIR/logs/pipeline_$(date +%Y%m%d_%H%M%S)_$$.log"
     [[ $DRY_RUN -eq 1 ]] && MAIN_LOG=/dev/null
+    log "bgc_pipeline.sh v$PIPELINE_VERSION ($PIPELINE_UPDATED) — Mikkel Bennetsen, AAU — github.com/Mikkelbenn2/ont-bgc-mining"
     log "Project: $PROJECT_DIR | isolates: ${#SAMPLES[@]} | threads: $THREADS | dry run: $DRY_RUN"
     [[ $DRY_RUN -eq 0 ]] && write_versions
     FAILED=()

@@ -223,4 +223,19 @@ Check page numbers and DOIs against the original papers before they go into a re
 
 ---
 
-*Built for the P7 project "AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates", Aalborg University, 2026.*
+## Author and acknowledgements
+
+| | |
+|---|---|
+| **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
+| **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
+| **Version** | 3.0.0 (last updated 2026-10-12) |
+| **License** | MIT (see `LICENSE`) |
+
+**AI assistance.** This pipeline was developed with help from Claude (Anthropic), an AI assistant. It was used to draft and test the code, to choose and compare tools, and to write the documentation. The author decided the design, reviewed the code and is responsible for how it is used and for the results it produces.
+
+**How to cite this pipeline**
+
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.0.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/ont-bgc-mining
+
+Please also cite the individual programs it runs (listed above).
