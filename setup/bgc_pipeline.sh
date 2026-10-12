@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.3
+#  Version       3.0.4
 #  Created       2026-10-06
 #  Last updated  2026-10-12
 #  License       MIT (see LICENSE)
@@ -24,6 +24,8 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.0.4  2026-10-12  Medaka: MEDAKA_MODEL setting; falls back to the bacterial R10.4.1 model
+#                       when --bacteria fails (reads from SRA have no model info in headers).
 #    3.0.3  2026-10-12  Comment listing the AAU BioCloud database folders and GTDB releases.
 #    3.0.2  2026-10-12  Uses the shared AAU server databases (/databases/GTDB, /databases/bakta,
 #                       /databases/checkm2) by default; finds the database folder inside them
@@ -51,7 +53,13 @@ FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)
 FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases
 FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb genome)
 
-POLISH=1                       # 1 = polish with Medaka (--bacteria model), 0 = skip
+POLISH=1                       # 1 = polish with Medaka, 0 = skip
+MEDAKA_MODEL="auto"            # "auto" = let Medaka read the model from the read headers (--bacteria).
+                               # Reads downloaded from SRA/ENA have lost those headers, so "auto"
+                               # fails; the script then retries with the bacterial R10.4.1 model:
+                               #   r1041_e82_400bps_bacterial_methylation
+                               # Or set a model name here yourself (list: medaka tools list_models).
+                               # This model is ONLY right for R10.4.1 flow cells (not R9.4.1).
 BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)
 
 # Databases that ALREADY EXIST on the server (shared copies), so "setup" does not have to
@@ -122,7 +130,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.3"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.0.4"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-12"
 
 
@@ -347,8 +355,21 @@ step_flye() {
 # NRPS/PKS gene. --bacteria selects the model trained on native (methylated) bacterial DNA.
 step_medaka() {
   if [[ "$POLISH" -eq 1 ]]; then
-    run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
-      -t "$THREADS" --bacteria || return 1
+    local bact_model="r1041_e82_400bps_bacterial_methylation"
+    if [[ "$MEDAKA_MODEL" == auto ]]; then
+      if ! run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
+             -t "$THREADS" --bacteria; then
+        # Typical cause: SRA/ENA reads have no basecaller info in the headers, so Medaka
+        # cannot check that the bacterial model fits. Give the model explicitly instead.
+        warn "Medaka could not pick a model automatically for $S; retrying with -m $bact_model"
+        rm -rf "$SD/04_medaka"
+        run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
+          -t "$THREADS" -m "$bact_model" || return 1
+      fi
+    else
+      run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
+        -t "$THREADS" -m "$MEDAKA_MODEL" || return 1
+    fi
     run_plain cp "$SD/04_medaka/consensus.fasta" "$GENOME" || return 1
   else
     run_plain cp "$DRAFT" "$GENOME" || return 1
