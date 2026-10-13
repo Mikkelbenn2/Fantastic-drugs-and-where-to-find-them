@@ -1,4 +1,4 @@
-# Fantastic drugs and where to find them 🧪🌱
+# Fantastic drugs and where to find them 
 
 **From Oxford Nanopore reads of soil isolates to a ranked list of novel antimicrobial gene clusters.**
 
@@ -11,12 +11,12 @@
 
 It then compares all isolates and all BGCs with databases of *known* clusters. The result is a ranked table showing which BGCs are most likely to be **new**.
 
-The pipeline was built for the Tiny Earth soil isolates in our 7th-semester project (AAU, 2026). It works for any bacterial isolate sequenced with ONT.
+The pipeline was built for the Tiny Earth soil isolates in our 7th-semester project (AAU, 2026). It should work for any bacterial isolate sequenced with ONT.
 
 ---
 
 ## Pipeline overview
-
+The overalle work flow of the pipeline is portrayed below
 ![BGC screening pipeline flowchart](flowchart.png)
 
 ---
