@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.1.2
+#  Version       3.1.3
 #  Created       2026-10-06
 #  Last updated  2026-10-14
 #  License       MIT (see LICENSE)
@@ -24,6 +24,7 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.1.3  2026-10-14  BiG-SCAPE env pinned to Python 3.11 + SQLAlchemy 2.0.2 (newer SQLAlchemy crashes it).
 #    3.1.2  2026-10-14  GTDB-Tk: removed --skip_ani_screen (no longer exists in GTDB-Tk >= 2.7).
 #    3.1.1  2026-10-14  RGI: threads given as -n (newer RGI renamed --num_threads to --threads).
 #    3.1.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
@@ -145,11 +146,12 @@ declare -A ENV_PACKAGES=(
   [rgi]="rgi>=6.0"
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
-  [bigscape]="bigscape>=2.0"
+  [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"   # same pins as BiG-SCAPE's own environment.yml;
+                                 # newer SQLAlchemy crashes it ("Not an executable object")
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.1.2"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.1.3"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-14"
 
 
