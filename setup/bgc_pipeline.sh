@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.1.0
+#  Version       3.1.1
 #  Created       2026-10-06
 #  Last updated  2026-10-14
 #  License       MIT (see LICENSE)
@@ -24,6 +24,7 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.1.1  2026-10-14  RGI: threads given as -n (newer RGI renamed --num_threads to --threads).
 #    3.1.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
 #                       shared antiSMASH database if it fits, and only downloads what is missing;
 #                       prints which database each program uses.
@@ -147,7 +148,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.1.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.1.1"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-14"
 
 
@@ -469,7 +470,7 @@ step_rgi() {
   run_plain ln -sfn "$CARD_DB/localDB" "$out/localDB" || return 1     # rgi --local looks in ./localDB
   ( [[ $DRY_RUN -eq 1 ]] || cd "$out" || exit 1
     run_in_env rgi rgi main --input_sequence "$GENOME" --output_file "$out/${S}_rgi" \
-      --input_type contig --alignment_tool DIAMOND --num_threads "$THREADS" --local --clean )
+      --input_type contig --alignment_tool DIAMOND -n "$THREADS" --local --clean )
 }
 
 process_sample() {
