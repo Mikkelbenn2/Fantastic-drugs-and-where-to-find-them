@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.0.6
+#  Version       3.1.0
 #  Created       2026-10-06
-#  Last updated  2026-10-12
+#  Last updated  2026-10-14
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -24,6 +24,9 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.1.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
+#                       shared antiSMASH database if it fits, and only downloads what is missing;
+#                       prints which database each program uses.
 #    3.0.6  2026-10-12  QUAST env pinned to Python 3.11 (QUAST needs distutils, gone in 3.12+).
 #    3.0.5  2026-10-12  Bakta: skips databases too old for Bakta >= 1.10 (no "type" key in
 #                       version.json) and downloads its own copy in setup instead.
@@ -93,6 +96,16 @@ SHARED_GTDBTK_DB="/databases/GTDB/gtdbtk_packages/GTDB-TK_release232_2026_04_15"
                                # GTDB-Tk 2.7.x needs release 232; an older GTDB-Tk needs an older release
 SHARED_BAKTA_DB="/databases/bakta"
 SHARED_CHECKM2_DB="/databases/checkm2"
+SHARED_ANTISMASH_DB="/databases/AntiSMASH_databases"
+                               # only used if a version there fits our antiSMASH (8.x); the
+                               # AntiSMASH-5.1.0 folder does not, so "setup" downloads its own
+# Not on BioCloud, so "setup" always downloads it: CARD (for RGI). BioCloud has ResFinder and
+# deepARG, but RGI needs CARD.
+
+# "setup" puts a link to EVERY folder in this server database folder into
+# setup/databases/biocloud/, so all BioCloud databases are easy to find next to the pipeline's own.
+# Empty "" = not on BioCloud, make no links.
+SHARED_DB_ROOT="/databases"
 
 # Optional programs (1 = run, 0 = skip)
 RUN_GECCO=1                    # machine-learning BGC detection
@@ -134,8 +147,8 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.0.6"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-10-12"
+PIPELINE_VERSION="3.1.0"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-10-14"
 
 
 set -uo pipefail
@@ -159,6 +172,21 @@ CARD_DB="$DB_DIR/card"
 GTDBTK_DB="$DB_DIR/gtdbtk"
 
 # ---------- locating the databases (shared server copy first, then our own) ----------
+# antiSMASH: setup tests the shared copies with "antismash --check-prereqs" (it checks that the
+# database versions match the installed antiSMASH) and writes the one to use into this file.
+ANTISMASH_DB_CHOICE="$DB_DIR/antismash_db_in_use.txt"
+antismash_db_path() {
+  local d
+  if [[ -s "$ANTISMASH_DB_CHOICE" ]]; then
+    d=$(head -n 1 "$ANTISMASH_DB_CHOICE"); [[ -d "$d" ]] && { echo "$d"; return; }
+  fi
+  echo "$ANTISMASH_DB"
+}
+antismash_db_ok() {   # true if antiSMASH accepts this database folder
+  [[ -d "$1/clusterblast" ]] || return 1
+  "$CONDA_RUN" run -p "$ENV_DIR/antismash" antismash --check-prereqs --databases "$1" >>"$MAIN_LOG" 2>&1
+}
+
 # find_db_dir TOP NAME : the folder below TOP that contains NAME (a file or folder that
 # marks the database), e.g. bakta.db or taxonomy/. Prints nothing if not found.
 find_db_dir() {
@@ -418,7 +446,7 @@ step_antismash() {
   local out="$SD/08_antismash"
   # shellcheck disable=SC2206
   local extra=($ANTISMASH_EXTRA)
-  local common=(--cpus "$THREADS" --taxon bacteria --databases "$ANTISMASH_DB"
+  local common=(--cpus "$THREADS" --taxon bacteria --databases "$(antismash_db_path)"
                 --output-basename "$S" --output-dir "$out" "${extra[@]}")
   if ! run_in_env antismash antismash "${common[@]}" --genefinding-tool none "$GBFF"; then
     warn "antiSMASH could not use the Bakta GenBank for $S — retrying on FASTA + Prodigal"
@@ -526,8 +554,8 @@ step_bigscape() {
   log "    $n BGC regions collected"
   [[ $DRY_RUN -eq 1 || $n -gt 0 ]] || return 0
   local pfam
-  pfam=$(find "$ANTISMASH_DB" -name 'Pfam-A.hmm' 2>/dev/null | sort | tail -n 1)   # reuse antiSMASH's Pfam
-  [[ -n "$pfam" || $DRY_RUN -eq 1 ]] || { log "    Pfam-A.hmm not found in $ANTISMASH_DB"; return 1; }
+  pfam=$(find -L "$(antismash_db_path)" -name 'Pfam-A.hmm' 2>/dev/null | sort | tail -n 1)   # reuse antiSMASH's Pfam
+  [[ -n "$pfam" || $DRY_RUN -eq 1 ]] || { log "    Pfam-A.hmm not found in $(antismash_db_path)"; return 1; }
   run_in_env bigscape bigscape cluster -i "$out/input" -o "$out/output" -p "${pfam:-Pfam-A.hmm}" \
     --mibig-version "$BIGSCAPE_MIBIG_VERSION" --gcf-cutoffs "$BIGSCAPE_CUTOFF" \
     --include-singletons --label P7 -c "$THREADS"
@@ -571,12 +599,37 @@ do_setup() {
       >>"$MAIN_LOG" 2>&1 || { warn "  $env: install FAILED (see $MAIN_LOG)"; fail=1; }
   done
 
-  log "Downloading databases into $DB_DIR (skips existing ones; GTDB-Tk takes hours)"
-  if [[ ! -d "$ANTISMASH_DB/clusterblast" ]]; then
-    mkdir -p "$ANTISMASH_DB"
-    run_in_env antismash download-antismash-databases --database-dir "$ANTISMASH_DB" \
-      || { warn "antiSMASH databases FAILED"; fail=1; }
-  else log "  antiSMASH: present"; fi
+  # Links to every BioCloud database (only for finding them; the pipeline reads the SHARED_* paths)
+  if [[ -n "$SHARED_DB_ROOT" && -d "$SHARED_DB_ROOT" ]]; then
+    local link_dir="$DB_DIR/biocloud" d n=0
+    mkdir -p "$link_dir"
+    for d in "$SHARED_DB_ROOT"/*; do
+      [[ -e "$link_dir/$(basename "$d")" ]] || { ln -s "$d" "$link_dir/" && n=$((n + 1)); }
+    done
+    log "  BioCloud databases: linked in $link_dir ($n new links)"
+  fi
+
+  log "Databases: using shared server copies where they fit, downloading the rest into $DB_DIR"
+  # antiSMASH: try each shared version folder (newest first), then our own copy, else download
+  local as_db=""
+  if [[ -n "$SHARED_ANTISMASH_DB" && -d "$SHARED_ANTISMASH_DB" ]]; then
+    while read -r d; do
+      if antismash_db_ok "$d"; then as_db=$d; break
+      else log "  antiSMASH: shared $d does not fit antiSMASH $("$CONDA_RUN" run -p "$ENV_DIR/antismash" antismash --version 2>/dev/null | awk '{print $2}') — skipped"; fi
+    done < <(find -L "$SHARED_ANTISMASH_DB" -maxdepth 3 -type d -name clusterblast \
+               -printf '%h\n' 2>/dev/null | sort -rV)
+  fi
+  if [[ -z "$as_db" ]]; then
+    if [[ ! -d "$ANTISMASH_DB/clusterblast" ]]; then
+      log "  antiSMASH: downloading our own (~10 GB)"
+      mkdir -p "$ANTISMASH_DB"
+      run_in_env antismash download-antismash-databases --database-dir "$ANTISMASH_DB" \
+        || { warn "antiSMASH databases FAILED"; fail=1; }
+    fi
+    as_db=$ANTISMASH_DB
+  fi
+  echo "$as_db" >"$ANTISMASH_DB_CHOICE"
+  log "  antiSMASH: using $as_db"
 
   if bakta_db_ok "$(bakta_db_path)"; then log "  Bakta: present ($(bakta_db_path))"
   else
@@ -613,6 +666,12 @@ do_setup() {
     fi
   fi
 
+  log "Databases in use:"
+  log "  antiSMASH  $(antismash_db_path)"
+  log "  Bakta      $(bakta_db_path)"
+  log "  CheckM2    $(checkm2_dmnd)"
+  log "  CARD       $CARD_DB/localDB"
+  [[ $RUN_GTDBTK -eq 1 ]] && log "  GTDB-Tk    $(gtdbtk_db_path)"
   if [[ $fail -eq 0 ]]; then
     log "Setup complete. Put reads in $RAW_DIR, then: bash $SCRIPT_PATH run --dry-run"
   else
