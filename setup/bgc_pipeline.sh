@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.1.1
+#  Version       3.1.2
 #  Created       2026-10-06
 #  Last updated  2026-10-14
 #  License       MIT (see LICENSE)
@@ -24,6 +24,7 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.1.2  2026-10-14  GTDB-Tk: removed --skip_ani_screen (no longer exists in GTDB-Tk >= 2.7).
 #    3.1.1  2026-10-14  RGI: threads given as -n (newer RGI renamed --num_threads to --threads).
 #    3.1.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
 #                       shared antiSMASH database if it fits, and only downloads what is missing;
@@ -142,13 +143,13 @@ declare -A ENV_PACKAGES=(
   [antismash]="antismash>=8.0"
   [gecco]="gecco>=0.9.10"
   [rgi]="rgi>=6.0"
-  [gtdbtk]="gtdbtk>=2.4"
+  [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
   [bigscape]="bigscape>=2.0"
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.1.1"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.1.2"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-10-14"
 
 
@@ -505,13 +506,15 @@ finished_genomes() {   # prints "name<TAB>genome path" for isolates whose genome
 
 # GTDB-Tk — species from the genome (much finer than 16S, especially in Streptomyces).
 # No species match ("s__" empty) = possibly a NEW species. Runs once for all isolates.
+# GTDB-Tk >= 2.7 first compares every genome to all GTDB references with skani (the "ANI
+# screen"); --skip_ani_screen no longer exists there.
 step_gtdbtk() {
   local out="$COMBINED_DIR/gtdbtk" name g
   [[ $DRY_RUN -eq 0 ]] && mkdir -p "$out/genomes"
   while IFS=$'\t' read -r name g; do run_plain ln -sf "$g" "$out/genomes/$name.fasta"; done < <(finished_genomes)
   run_in_env gtdbtk bash -c 'export GTDBTK_DATA_PATH="$1"; shift; gtdbtk "$@"' _ "$(gtdbtk_db_path)" \
     classify_wf --genome_dir "$out/genomes" --extension fasta --out_dir "$out" \
-    --cpus "$THREADS" --skip_ani_screen
+    --cpus "$THREADS"
 }
 
 # GToTree — phylogenetic tree from single-copy marker genes, with the closest GTDB reference
