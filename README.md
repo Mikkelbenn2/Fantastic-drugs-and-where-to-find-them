@@ -5,11 +5,11 @@
 `bgc_pipeline.sh` is a single bash script. It takes every isolate in `raw_data/` and does the following for each one:
 
 1. Checks and filters the reads.
-2. Assembles and polishes the genome.
+2. Assembles the genome (no polishing: R10.4.1 reads basecalled with Dorado *sup* are accurate enough).
 3. Annotates all genes.
-4. Finds the biosynthetic gene clusters (BGCs) that make specialised metabolites such as antibiotics.
+4. Finds the biosynthetic gene clusters (BGCs) that make specialised metabolites such as antibiotics, with four independent tools: antiSMASH, GECCO, DeepBGC and BGC-Prophet.
 
-It then compares all isolates and all BGCs with databases of *known* clusters. The result is a ranked table showing which BGCs are most likely to be **new**.
+It then compares all isolates and all BGCs with databases of *known* clusters. The result is one master table that merges the four tools, adds QC and taxonomy, and ranks which BGCs are most likely to be **new**.
 
 The pipeline was built for the Tiny Earth soil isolates in our 7th-semester project (AAU, 2026). It should work for any bacterial isolate sequenced with ONT.
 
@@ -27,18 +27,20 @@ The overalle work flow of the pipeline is portrayed below
 |---|---|---|---|---|
 | 1 | **NanoPlot** | Read length and quality plots | Catches a bad sequencing run before hours of assembly | `01_nanoplot/` |
 | 2 | **Filtlong** | Removes short and low-quality reads | Cleaner input gives a better assembly | `02_filtlong/` |
-| 3 | **Flye** | De novo genome assembly | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_flye/` |
-| 4 | **Medaka** | Polishing with the bacterial model | Fixes small errors. A single indel in a gene splits it in two and breaks BGC prediction | `04_medaka/` |
+| 3 | **mmlong2-lite** or **Flye** (`ASSEMBLER` setting) | De novo genome assembly (mmlong2 also removes misassemblies) | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_mmlong2/` or `03_flye/` |
 | 5 | **QUAST** | Number of contigs, genome length, N50, GC% | Shows how complete the assembly is in one piece | `05_quast/` |
 | 6 | **CheckM2** | Completeness and contamination | Confirms the genome is complete (> 95 %) and the culture is pure (< 5 %) | `06_checkm2/` |
 | 7 | **Bakta** | Finds and names all genes | Every later tool uses the same gene calls (Bakta replaces Prokka, which is no longer maintained) | `07_bakta/` |
 | 8 | **antiSMASH** | Rule-based BGC detection, compared with MIBiG | Finds NRPS, PKS, RiPP, terpene and other clusters, and reports the % similarity to known BGCs | `08_antismash/` |
 | 9 | **GECCO** | Machine-learning BGC detection | Independent second opinion; can find clusters that antiSMASH's rules miss | `09_gecco/` |
 | 10 | **RGI + CARD** | Antibiotic resistance genes | A resistance gene *inside* a BGC suggests self-resistance, so the product is likely an antibiotic | `10_rgi_card/` |
+| 13 | **DeepBGC** | Deep-learning BGC detection + product class and **activity** (antibacterial, antifungal, cytotoxic, inhibitor) | A third opinion, and the only tool here that predicts activity. It calls more, smaller BGCs than antiSMASH | `13_deepbgc/` |
+| 14 | **BGC-Prophet** | Protein-language-model (ESM-2) BGC detection + product class | Fourth opinion that does not depend on Pfam domains, so it can catch unusual clusters | `14_bgc_prophet/` |
+| 15 | **DIAMOND vs MIBiG** | Compares every tool's BGCs with MIBiG, the way antiSMASH's KnownClusterBlast does | Gives GECCO, DeepBGC and BGC-Prophet BGCs a closest known cluster too | `15_mibig/` |
 | 11 | **GTDB-Tk** | Species identification from the genome | Much finer than 16S. "No species match" means a possible new species | `_combined/gtdbtk/` |
 | 12 | **GToTree** | Phylogenetic tree | Places the isolates next to their closest reference genomes | `_combined/gtotree/` |
 | 13 | **BiG-SCAPE** | Groups BGCs into families together with MIBiG | A family *without* any known (MIBiG) member means no characterised relative | `_combined/bigscape/` |
-| 14 | **Summary** | Ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
+| – | **Summary** | One table per tool, plus a master table that merges all tools and ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
 
 ---
 
@@ -80,16 +82,20 @@ Fantastic-drugs-and-where-to-find-them/
 ├── setup/
 │   ├── bgc_pipeline.sh        ← the pipeline
 │   ├── envs/                     one conda environment per program (created by setup)
-│   └── databases/                antiSMASH, Bakta, CheckM2, CARD, GTDB-Tk (created by setup)
+│   ├── databases/                antiSMASH, Bakta, CheckM2, CARD, GTDB-Tk, DeepBGC, BGC-Prophet (created by setup)
+│   └── tests/test_summary.sh     self-check of the summary code (needs only python3)
 └── results/
     ├── <isolate>/                one folder per isolate, one subfolder per program
     │   ├── 01_nanoplot/ … 10_rgi_card/
     │   ├── 11_gtdbtk/            this isolate's taxonomy
-    │   ├── 12_novelty/           this isolate's BGCs, ranked
+    │   ├── 12_novelty/           this isolate's antiSMASH BGCs, ranked
+    │   ├── 13_deepbgc/  14_bgc_prophet/  15_mibig/
     │   └── logs/                 exact command + full output of every program
     ├── _combined/                analyses across all isolates
     │   ├── gtdbtk/  gtotree/  bigscape/
-    │   └── summary/              genome_summary.tsv, bgc_summary.tsv   ← start here
+    │   └── summary/              master_summary.tsv   ← start here
+    │                             per_tool/{antismash,gecco,deepbgc,bgc_prophet}_bgcs.tsv
+    │                             genome_summary.tsv, bgc_summary.tsv (antiSMASH-only ranking, as before)
     ├── slurm_logs/
     └── software_versions.tsv     exact version of every program (for your Methods)
 ```
@@ -109,9 +115,30 @@ Isolate names come from the file or folder names in `raw_data/`. For example, `S
 | `circular_contigs`, `mean_depth` | From Flye. Note that *Streptomyces* chromosomes are linear, which is normal |
 | `completeness`, `contamination` | CheckM2 (%) |
 | `gtdb_classification`, `closest_ANI`, `possible_new_species` | GTDB-Tk |
-| `BGCs_antismash`, `BGCs_gecco`, `resistance_genes` | Counts per isolate |
+| `BGCs_antismash`, `BGCs_gecco`, `BGCs_deepbgc`, `BGCs_bgc_prophet`, `BGC_loci_all_tools`, `resistance_genes` | Counts per isolate |
 
-### `bgc_summary.tsv`: one row per BGC, best candidates first
+### `master_summary.tsv`: all tools merged, one row per BGC locus, best candidates first
+
+Predictions from the four tools that overlap on the same contig are merged into one **locus**.
+
+| Column | Meaning |
+|---|---|
+| `rank`, `priority_score`, `novelty` | Order in which to inspect the loci (see the score below) |
+| `isolate`, `locus_id`, `contig`, `start`, `end`, `length_kb` | Where the locus is (start/end span all tools' predictions) |
+| `tools`, `n_tools` | Which tools found it. Found by several tools = well supported |
+| `antismash_regions`, `antismash_type`, `antismash_class`, `gecco_type`, `deepbgc_class`, `bgc_prophet_class` | Each tool's prediction of the product type |
+| `deepbgc_activity`, `deepbgc_max_antibacterial_or_antifungal` | DeepBGC's activity prediction and its highest antibacterial/antifungal score |
+| `closest_MIBiG`, `closest_MIBiG_compound`, `MIBiG_similarity_pct`, `MIBiG_from` | Best MIBiG match over all tools' predictions, and which tool/method gave it |
+| `resistance_gene_in_locus` | Possible self-resistance gene (RGI/CARD) |
+| `bigscape_family`, `family_MIBiG_members` | BiG-SCAPE family of the antiSMASH region(s) |
+| `contig_edge` | `yes` means the antiSMASH region touches a contig end and may be incomplete |
+| `genome_length` … `contamination`, `gtdb_classification` … `possible_new_species` | QC and taxonomy of the isolate, copied onto every row |
+
+### `per_tool/<tool>_bgcs.tsv`: one table per BGC finder
+
+One row per BGC as that tool predicted it, with the tool's own scores and the same MIBiG columns for every tool (`MIBiG_accession`, `MIBiG_compound`, `MIBiG_similarity_pct`, `MIBiG_method`). antiSMASH BGCs use antiSMASH's own KnownClusterBlast result. The other tools' BGCs are scored the same way from `15_mibig/`: the percentage of a MIBiG cluster's genes hit by the BGC's genes at > 45 % identity and > 40 % coverage, against the same MIBiG data antiSMASH uses. `locus_id` links each row to `master_summary.tsv`.
+
+### `bgc_summary.tsv`: one row per antiSMASH BGC (unchanged from earlier versions)
 
 | Column | Meaning |
 |---|---|
@@ -132,15 +159,18 @@ Isolate names come from the file or folder names in `raw_data/`. For example, `S
 | 30–79 %, or in a BiG-SCAPE family with a MIBiG BGC | `related`: possibly an analogue |
 | < 30 % or no hit | `novel_candidate` |
 
-**Priority score**:
+**Priority score** in `master_summary.tsv`:
 
 | Evidence | Points |
 |---|---|
 | `novel_candidate` / `related` | +3 / +1 |
-| NRPS, PKS or RiPP | +2 |
-| GECCO agrees | +1 |
-| Resistance gene inside the BGC | +2 |
+| NRPS, PKS or RiPP (by any tool) | +2 |
+| Each extra tool that found the locus | +1 (max +3) |
+| Resistance gene inside the locus | +2 |
+| DeepBGC antibacterial or antifungal score ≥ 0.5 | +1 |
 | On a contig edge | −1 |
+
+(`bgc_summary.tsv` keeps the old score, where "GECCO agrees" gives +1 instead of the tool and activity points.)
 
 The score is a triage aid. It tells you which clusters to open first in `results/<isolate>/08_antismash/index.html`. It does **not** prove that a compound is new or active.
 
@@ -157,8 +187,10 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `GENOME_SIZE` | empty | You know it, e.g. `8m` for *Streptomyces* |
 | `FILTLONG_TARGET_BASES` | empty | Coverage is very deep (> 150x): cap it at about 100 × genome size |
 | `SHARED_GTDBTK_DB`, `SHARED_BAKTA_DB`, `SHARED_CHECKM2_DB`, `SHARED_ANTISMASH_DB` | AAU server: `/databases/...` | You are on another server: point them at its shared databases, or set `""` to let `setup` download them |
-| `POLISH` | 1 | Set to 0 to skip Medaka |
-| `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
+| `ASSEMBLER` | `mmlong2` | Use `flye` for the separate Filtlong → Flye route |
+| `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_DEEPBGC`, `RUN_BGCPROPHET`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
+| `DEEPBGC_SCORE`, `BGCPROPHET_THRESHOLD`, `BGCPROPHET_CLASSIFY_T` | 0.5 | You want the ML tools stricter (higher) or looser (lower) |
+| `BGCPROPHET_DEVICE` | `cpu` | Your Slurm job has a GPU: use `cuda` |
 | `GTOTREE_HMM` | `Bacteria` | All isolates are actinomycetes: use `Actinobacteria` |
 | `KNOWN_SIMILARITY`, `RELATED_SIMILARITY` | 80, 30 | You want stricter or looser novelty labels |
 | `SLURM_PARTITION`, `SLURM_*_MEM`, `SLURM_*_TIME` | cluster default | Your cluster needs a partition name or other resources |
@@ -176,6 +208,8 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Redo only the comparison steps | `bash setup/bgc_pipeline.sh combined` |
 | Follow Slurm jobs | `squeue --me` and `tail -f results/slurm_logs/*.out` |
 | Find out why a step failed | `tail -n 30 results/<isolate>/logs/<step>.log` |
+| Check the summary code after editing it | `bash setup/tests/test_summary.sh` |
+| Validate the pipeline on known genomes | Positive and negative controls: see `controls/README.md` |
 
 ---
 
@@ -208,13 +242,16 @@ Cite each program by its paper:
 - **NanoPlot:** De Coster & Rademakers (2023), *Bioinformatics* 39:btad311.
 - **Filtlong:** github.com/rrwick/Filtlong.
 - **Flye:** Kolmogorov et al. (2019), *Nat Biotechnol* 37:540–546.
-- **Medaka:** github.com/nanoporetech/medaka.
+- **mmlong2:** Sereika et al. (2025), *Nat Microbiol* (github.com/Serka-M/mmlong2).
 - **QUAST:** Gurevich et al. (2013), *Bioinformatics* 29:1072–1075.
 - **CheckM2:** Chklovski et al. (2023), *Nat Methods* 20:1203–1212.
 - **Bakta:** Schwengers et al. (2021), *Microb Genom* 7:000685.
 - **antiSMASH 8:** Blin et al. (2025), *Nucleic Acids Res* 53:W32–W38.
 - **MIBiG 4.0:** Zdouc et al. (2025), *Nucleic Acids Res*.
 - **GECCO:** Carroll et al. (2021), *bioRxiv* 10.1101/2021.05.03.442509.
+- **DeepBGC:** Hannigan et al. (2019), *Nucleic Acids Res* 47:e110.
+- **BGC-Prophet:** Lai et al. (2025), *Nucleic Acids Res*, 10.1093/nar/gkaf305.
+- **DIAMOND:** Buchfink et al. (2021), *Nat Methods* 18:366–368.
 - **RGI/CARD:** Alcock et al. (2023), *Nucleic Acids Res* 51:D690–D699.
 - **GTDB-Tk:** Chaumeil et al. (2022), *Bioinformatics* 38:5315–5316.
 - **GToTree:** Lee (2019), *Bioinformatics* 35:4162–4164.
@@ -230,13 +267,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.0.0 (last updated 2026-10-12) |
+| **Version** | 3.3.0 (last updated 2026-11-06) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.0.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.3.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

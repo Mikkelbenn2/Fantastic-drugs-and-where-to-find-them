@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.1.3
+#  Version       3.3.0
 #  Created       2026-10-06
-#  Last updated  2026-10-14
+#  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -18,18 +18,26 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.0.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.3.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
-#    3.1.3  2026-10-14  BiG-SCAPE env pinned to Python 3.11 + SQLAlchemy 2.0.2 (newer SQLAlchemy crashes it).
-#    3.1.2  2026-10-14  GTDB-Tk: removed --skip_ani_screen (no longer exists in GTDB-Tk >= 2.7).
-#    3.1.1  2026-10-14  RGI: threads given as -n (newer RGI renamed --num_threads to --threads).
-#    3.1.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
+#    3.3.0  2026-11-06  Two more BGC finders: DeepBGC (13_deepbgc) and BGC-Prophet (14_bgc_prophet).
+#                       Every tool's BGCs are compared with MIBiG the same way (15_mibig: DIAMOND
+#                       against antiSMASH's KnownClusterBlast data, same cut-offs). New summaries:
+#                       per_tool/<tool>_bgcs.tsv and master_summary.tsv (all tools merged per
+#                       locus + QC + taxonomy + ranking). No polishing any more (Medaka removed):
+#                       R10.4.1 + Dorado sup reads are accurate enough on their own.
+#    3.2.1  2026-10-26  Brings back fixes from the 3.1.x line that 3.2.0 lost: GTDB-Tk >= 2.7
+#                       without --skip_ani_screen (gone in 2.7), RGI threads as -n. BiG-SCAPE env
+#                       pinned to Python 3.11 + SQLAlchemy 2.0.2.
+#    3.2.0  2026-10-14  Setup links all BioCloud databases into setup/databases/biocloud/, uses a
 #                       shared antiSMASH database if it fits, and only downloads what is missing;
 #                       prints which database each program uses.
+#    3.1.0  2026-10-14  ASSEMBLER setting: "mmlong2" (default) runs mmlong2-lite for assembly +
+#                       Medaka polishing + curation in one step; "flye" keeps the old route.
 #    3.0.6  2026-10-12  QUAST env pinned to Python 3.11 (QUAST needs distutils, gone in 3.12+).
 #    3.0.5  2026-10-12  Bakta: skips databases too old for Bakta >= 1.10 (no "type" key in
 #                       version.json) and downloads its own copy in setup instead.
@@ -55,20 +63,32 @@
 
 THREADS=16                     # CPUs per program (inside Slurm: taken from the job)
 
+# Which route turns reads into a genome (no polishing in either route):
+#   "mmlong2" = mmlong2-lite (AAU, Sereika et al.) does it in ONE step:
+#               metaFlye assembly -> removal of misassemblies (curation).
+#               The pipeline stops mmlong2 there (-run curation); binning is not used.
+#   "flye"    = the earlier route: Filtlong -> Flye as separate steps.
+ASSEMBLER="mmlong2"
+MMLONG2_INPUT="raw"            # "raw" = all reads straight into mmlong2.
+                               # "filtered" = Filtlong first (the mmlong2 FAQ recommends removing
+                               # low-quality reads before mmlong2).
+MMLONG2_CMD=""                 # empty = use the pipeline's own install (setup/envs/mmlong2).
+                               # Or the path/name of an mmlong2-lite already on the server.
+MMLONG2_CONTAINER=1            # 1 = mmlong2's Singularity container (default, downloaded once in
+                               # "setup"); 0 = conda environments instead (-env)
+MMLONG2_KEEP_TMP=0             # 1 = keep mmlong2's large temporary files (BAM files etc.)
+
 # Reads. "nano-hq" = R10.4.1 + Dorado hac/sup (Q15-20+). Use "nano-raw" for old R9.4.1 data.
+# Without polishing, R10.4.1 reads should be basecalled with Dorado "sup" (Q20+); older/noisier
+# reads give frameshifts in long NRPS/PKS genes.
+# FLYE_READ_MODE and GENOME_SIZE are only used by ASSEMBLER="flye" (mmlong2 always uses
+# --nano-hq --meta). The FILTLONG_* settings are used by "flye" and by MMLONG2_INPUT="filtered".
 FLYE_READ_MODE="nano-hq"
 GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it
 FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)
 FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases
 FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb genome)
 
-POLISH=1                       # 1 = polish with Medaka, 0 = skip
-MEDAKA_MODEL="auto"            # "auto" = let Medaka read the model from the read headers (--bacteria).
-                               # Reads downloaded from SRA/ENA have lost those headers, so "auto"
-                               # fails; the script then retries with the bacterial R10.4.1 model:
-                               #   r1041_e82_400bps_bacterial_methylation
-                               # Or set a model name here yourself (list: medaka tools list_models).
-                               # This model is ONLY right for R10.4.1 flow cells (not R9.4.1).
 BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)
 
 # Databases that ALREADY EXIST on the server (shared copies), so "setup" does not have to
@@ -112,7 +132,9 @@ SHARED_DB_ROOT="/databases"
 
 # Optional programs (1 = run, 0 = skip)
 RUN_GECCO=1                    # machine-learning BGC detection
-RUN_RGI=1                      # resistance genes (CARD)
+RUN_DEEPBGC=1                  # deep-learning BGC detection + product class/activity prediction
+RUN_BGCPROPHET=1               # protein-language-model BGC detection + product class
+RUN_RGI=1                     # resistance genes (CARD)
 RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100 GB RAM
 RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)
 RUN_BIGSCAPE=1                 # BGC families compared with MIBiG
@@ -121,6 +143,12 @@ GTOTREE_HMM="Bacteria"         # marker set; "Actinobacteria" if all isolates ar
 
 # antiSMASH extra analyses. --cb-knownclusters (MIBiG comparison) is ESSENTIAL for novelty.
 ANTISMASH_EXTRA="--cb-knownclusters --cb-subclusters --cc-mibig --asf --rre --tfbs --pfam2go --clusterhmmer --tigrfam --smcog-trees"
+
+DEEPBGC_SCORE=0.5              # DeepBGC: minimum BGC score per gene (its default)
+BGCPROPHET_THRESHOLD=0.5       # BGC-Prophet: gene score cut-off (value used in its README)
+BGCPROPHET_CLASSIFY_T=0.5      # BGC-Prophet: class score cut-off (README value)
+BGCPROPHET_DEVICE="cpu"        # "cuda" if the job has a GPU (much faster)
+BGCPROPHET_MODEL_URL="https://github.com/HUST-NingKang-Lab/BGC-Prophet/files/12733164/model.tar.gz"
 
 BIGSCAPE_MIBIG_VERSION="4.0"
 BIGSCAPE_CUTOFF="0.30"
@@ -137,22 +165,23 @@ SLURM_COMBINED_CPUS=32; SLURM_COMBINED_MEM="128G"; SLURM_COMBINED_TIME="1-00:00:
 declare -A ENV_PACKAGES=(
   [reads]="nanoplot>=1.42 filtlong>=0.2.1 seqkit>=2.8"
   [flye]="flye>=2.9.5"
-  [medaka]="medaka>=2.0 samtools>=1.20"
+  [mmlong2]="mmlong2-lite"       # only used when ASSEMBLER="mmlong2"
   [quast]="quast>=5.2 python=3.11"   # QUAST still imports distutils, which Python 3.12+ removed
   [checkm2]="checkm2>=1.0.2"
   [bakta]="bakta>=1.10"
   [antismash]="antismash>=8.0"
   [gecco]="gecco>=0.9.10"
+  [deepbgc]="deepbgc>=0.1.31 python=3.7"   # needs TensorFlow 1.x, which only exists up to Python 3.7
+  [bgcprophet]="bgc-prophet>=0.1.2"
   [rgi]="rgi>=6.0"
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
-  [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"   # same pins as BiG-SCAPE's own environment.yml;
-                                 # newer SQLAlchemy crashes it ("Not an executable object")
+  [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.1.3"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-10-14"
+PIPELINE_VERSION="3.3.0"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-11-06"
 
 
 set -uo pipefail
@@ -174,6 +203,8 @@ BAKTA_DB_PARENT="$DB_DIR/bakta"
 CHECKM2_DB="$DB_DIR/checkm2"
 CARD_DB="$DB_DIR/card"
 GTDBTK_DB="$DB_DIR/gtdbtk"
+DEEPBGC_DB="$DB_DIR/deepbgc"           # DeepBGC models + its Pfam (DEEPBGC_DOWNLOADS_DIR)
+BGCPROPHET_DB="$DB_DIR/bgc_prophet"    # BGC-Prophet models + ESM-2 weights (TORCH_HOME)
 
 # ---------- locating the databases (shared server copy first, then our own) ----------
 # antiSMASH: setup tests the shared copies with "antismash --check-prereqs" (it checks that the
@@ -238,6 +269,22 @@ checkm2_dmnd() {
     hit=$(find -L "$top" -maxdepth 4 -name '*.dmnd' 2>/dev/null | sort | head -n 1)
     [[ -n "$hit" ]] && { echo "$hit"; return; }
   done
+}
+
+# MIBiG data that antiSMASH's KnownClusterBlast uses (proteins.dmnd + clusters.txt, newest
+# version folder). All tools' BGCs are compared against this, so they share one MIBiG version.
+kcb_dir() {
+  local hit
+  hit=$(find -L "$(antismash_db_path)/knownclusterblast" -maxdepth 2 -name proteins.dmnd 2>/dev/null | sort -V | tail -n 1)
+  [[ -n "$hit" ]] && dirname "$hit"
+  return 0
+}
+# BGC-Prophet: the folder with annotator.pt + classifier.pt (its README spells it "annoator.pt")
+bgcprophet_model_dir() {
+  local hit
+  hit=$(find -L "$BGCPROPHET_DB" -maxdepth 4 -name 'anno*tor.pt' 2>/dev/null | sort | head -n 1)
+  [[ -n "$hit" ]] && dirname "$hit"
+  return 0
 }
 
 [[ -n "${SLURM_CPUS_PER_TASK:-}" ]] && THREADS=$SLURM_CPUS_PER_TASK
@@ -334,8 +381,14 @@ set_sample() {
   SD="$RESULTS_DIR/$S"; SL="$SD/logs"
   READS="$SD/01_nanoplot/$S.reads.fastq.gz"   # all reads joined
   FILT="$SD/02_filtlong/$S.filtered.fastq.gz"
-  DRAFT="$SD/03_flye/assembly.fasta"
-  GENOME="$SD/04_medaka/$S.fasta"          # final genome used by all later steps
+  if [[ "$ASSEMBLER" == mmlong2 ]]; then
+    MM="$SD/03_mmlong2"
+    DRAFT="$MM/draft_assembly.fasta"       # metaFlye assembly before curation
+    GENOME="$MM/$S.fasta"                  # curated = final genome
+  else
+    DRAFT="$SD/03_flye/assembly.fasta"
+    GENOME="$SD/03_flye/$S.fasta"          # final genome used by all later steps
+  fi
   GBFF="$SD/07_bakta/$S.gbff"
 }
 
@@ -371,7 +424,7 @@ step_nanoplot() {
     --threads "$THREADS" --tsv_stats --loglength
 }
 
-# 02 Filtlong — remove short and low-quality reads so Flye and Medaka get cleaner input.
+# 02 Filtlong — remove short and low-quality reads so Flye gets cleaner input.
 step_filtlong() {
   [[ $DRY_RUN -eq 1 || -s "$READS" ]] || join_reads || return 1
   local args=(--min_length "$FILTLONG_MIN_LEN" --keep_percent "$FILTLONG_KEEP_PERCENT")
@@ -390,39 +443,52 @@ step_flye() {
   local args=("--$FLYE_READ_MODE" "$FILT" --out-dir "$SD/03_flye" --threads "$THREADS")
   [[ -n "$GENOME_SIZE" ]] && args+=(--genome-size "$GENOME_SIZE")
   run_in_env flye flye "${args[@]}" || return 1
-  need "$DRAFT"
+  need "$DRAFT" || return 1
+  run_plain cp "$DRAFT" "$GENOME" || return 1     # no polishing: the Flye assembly is the genome
+  need "$GENOME"
 }
 
-# 04 Medaka — polishing. Fixes small indels; one indel in a gene = frameshift = broken
-# NRPS/PKS gene. --bacteria selects the model trained on native (methylated) bacterial DNA.
-step_medaka() {
-  if [[ "$POLISH" -eq 1 ]]; then
-    local bact_model="r1041_e82_400bps_bacterial_methylation"
-    if [[ "$MEDAKA_MODEL" == auto ]]; then
-      if ! run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
-             -t "$THREADS" --bacteria; then
-        # Typical cause: SRA/ENA reads have no basecaller info in the headers, so Medaka
-        # cannot check that the bacterial model fits. Give the model explicitly instead.
-        warn "Medaka could not pick a model automatically for $S; retrying with -m $bact_model"
-        rm -rf "$SD/04_medaka"
-        run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
-          -t "$THREADS" -m "$bact_model" || return 1
-      fi
-    else
-      run_in_env medaka medaka_consensus -i "$FILT" -d "$DRAFT" -o "$SD/04_medaka" \
-        -t "$THREADS" -m "$MEDAKA_MODEL" || return 1
-    fi
-    run_plain cp "$SD/04_medaka/consensus.fasta" "$GENOME" || return 1
+# 03 mmlong2-lite — assembly + curation in one go (ASSEMBLER="mmlong2"), without Medaka.
+#   metaFlye (--nano-hq --meta): the --meta mode copes with uneven coverage, e.g. plasmids
+#            that have many more copies than the chromosome.
+#   Curation: maps the reads back and cuts contigs where reads suggest a misassembly
+#            (zero coverage or many clipped reads), so a false join cannot create a fake BGC.
+# "-run curation" stops mmlong2 before eukaryote filtering and binning, which an isolate does not
+# need. Note: the mmlong2 FAQ says the workflow is built for complex metagenomes and is "not
+# optimal" for pure cultures; check QUAST/CheckM2 against the "flye" route on one isolate.
+step_mmlong2() {
+  local input="$READS" run="$MM/run"
+  if [[ "$MMLONG2_INPUT" == filtered ]]; then input="$FILT"
+  else [[ $DRY_RUN -eq 1 || -s "$READS" ]] || join_reads || return 1; fi
+  local args=(-np "$input" -o "$run" -p "$THREADS" -run curation -tmp "$MM/tmp")   # no -med = no Medaka
+  [[ "$MMLONG2_CONTAINER" -eq 0 ]] && args+=(-env)
+  [[ $DRY_RUN -eq 0 ]] && mkdir -p "$MM/tmp"
+  # mmlong2 checks for >= 100 GB free space in the folder it is started from -> start it in $MM.
+  if [[ -n "$MMLONG2_CMD" ]]; then
+    run_plain bash -c 'cd "$1" && shift && "$@"' _ "$MM" "$MMLONG2_CMD" "${args[@]}"
   else
-    run_plain cp "$DRAFT" "$GENOME" || return 1
+    run_in_env mmlong2 bash -c 'cd "$1" && shift && mmlong2-lite "$@"' _ "$MM" "${args[@]}"
+  fi || warn "mmlong2 ended with an error for $S — checking whether the genome was still made"
+  [[ $DRY_RUN -eq 1 ]] && return 0
+  local final="$run/tmp/curation/asm_curated.fasta"
+  [[ -s "$final" ]] || { log "    mmlong2 made no curated assembly — see $STEP_LOG and $run/"; return 1; }
+  cp "$final" "$GENOME"
+  cp "$run/tmp/assembly/assembly.fasta" "$DRAFT" 2>/dev/null
+  cp "$run/tmp/assembly/assembly_info.txt" "$MM/assembly_info.txt" 2>/dev/null
+  # read numbers for the summary table (Filtlong normally makes these)
+  run_in_env reads bash -c 'seqkit stats -a -T -j "$1" "$2" > "$3"' \
+    _ "$THREADS" "$input" "$MM/read_stats.tsv"
+  if [[ "$MMLONG2_KEEP_TMP" -eq 0 ]]; then
+    rm -rf "$MM/tmp"; find "$run" -name '*.bam*' -delete 2>/dev/null
   fi
   need "$GENOME"
 }
 
-# 05 QUAST — contiguity: number of contigs, total length, N50, GC%; draft vs. polished.
+# 05 QUAST — contiguity: number of contigs, total length, N50, GC%; draft vs. final
+# (identical in the "flye" route; after curation in the "mmlong2" route).
 step_quast() {
   run_in_env quast quast.py -o "$SD/05_quast" -t "$THREADS" \
-    --labels "flye_draft,polished" "$DRAFT" "$GENOME"
+    --labels "draft,final" "$DRAFT" "$GENOME"
 }
 
 # 06 CheckM2 — completeness (>95 % good) and contamination (<5 % good; high = mixed culture?)
@@ -476,20 +542,67 @@ step_rgi() {
       --input_type contig --alignment_tool DIAMOND -n "$THREADS" --local --clean )
 }
 
+# 13 DeepBGC — deep-learning (BiLSTM on Pfam domains) BGC detection; also predicts the product
+# class and ACTIVITY (antibacterial, antifungal, cytotoxic, inhibitor) of each BGC. Finds its own
+# genes (Prodigal) on the genome FASTA. Known to call more (and more fragmented) BGCs than
+# antiSMASH, so a DeepBGC-only hit is weak evidence on its own.
+step_deepbgc() {
+  local out="$SD/13_deepbgc"
+  run_in_env deepbgc bash -c 'export DEEPBGC_DOWNLOADS_DIR="$1"; shift; deepbgc "$@"' _ "$DEEPBGC_DB" \
+    pipeline "$GENOME" -o "$out" --score "$DEEPBGC_SCORE" || return 1
+  need "$out/13_deepbgc.bgc.tsv"      # DeepBGC names its files after the output folder
+}
+
+# 14 BGC-Prophet — transformer on ESM-2 protein embeddings; finds BGC genes and the product class.
+# It reads proteins, so it gets Bakta's proteins (same genes as antiSMASH). Writes <isolate>_classified.csv.
+step_bgcprophet() {
+  local out="$SD/14_bgc_prophet" m
+  m=$(bgcprophet_model_dir)
+  [[ -n "$m" || $DRY_RUN -eq 1 ]] || { log "    BGC-Prophet models missing — run: setup"; return 1; }
+  run_plain mkdir -p "$out/input" || return 1
+  run_plain ln -sf "$SD/07_bakta/$S.faa" "$out/input/$S.faa" || return 1
+  run_in_env bgcprophet bash -c 'export TORCH_HOME="$1"; cd "$2" && shift 2 && bgc_prophet "$@"' _ \
+    "$BGCPROPHET_DB/torch" "$out" pipeline --genomesDir "$out/input" --outputPath "$out" --name "$S" \
+    --modelPath "${m:-models}/annotator.pt" --classifierPath "${m:-models}/classifier.pt" \
+    --threshold "$BGCPROPHET_THRESHOLD" --max_gap 3 --min_count 2 --classify_t "$BGCPROPHET_CLASSIFY_T" \
+    --device "$BGCPROPHET_DEVICE" --threads "$THREADS" || return 1
+  need "$out/${S}_classified.csv"
+}
+
+# 15 MIBiG comparison for EVERY tool: all Bakta proteins vs. the MIBiG proteins of antiSMASH's
+# KnownClusterBlast (DIAMOND, as antiSMASH does). The summary then scores each predicted BGC
+# like KnownClusterBlast (% of a MIBiG cluster's genes hit at > 45 % identity, > 40 % coverage).
+step_mibig() {
+  local d
+  d=$(kcb_dir)
+  [[ -n "$d" || $DRY_RUN -eq 1 ]] || { log "    no knownclusterblast/*/proteins.dmnd in $(antismash_db_path)"; return 1; }
+  run_in_env antismash diamond blastp --query "$SD/07_bakta/$S.faa" --db "${d:-kcb}/proteins.dmnd" \
+    --out "$SD/15_mibig/${S}_vs_mibig.tsv" --outfmt 6 qseqid sseqid pident length qlen slen evalue bitscore \
+    --evalue 1e-05 --max-target-seqs 10000 --threads "$THREADS"
+}
+
 process_sample() {
   set_sample "$1" "$2"
   log "=== Isolate $S ==="
   [[ $DRY_RUN -eq 0 ]] && mkdir -p "$SD" "$SL"
   run_step 01_nanoplot  "$SD/01_nanoplot"  "$SL" step_nanoplot          "$S" || warn "NanoPlot failed for $S (continuing)"
-  run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong          "$S" || return 1
-  run_step 03_flye      "$SD/03_flye"      "$SL" step_flye              "$S" || return 1
-  run_step 04_medaka    "$SD/04_medaka"    "$SL" step_medaka            "$S" || return 1
+  if [[ "$ASSEMBLER" == mmlong2 ]]; then
+    # no polishing, so there is no 04 folder in either route
+    [[ "$MMLONG2_INPUT" == filtered ]] && { run_step 02_filtlong "$SD/02_filtlong" "$SL" step_filtlong "$S" || return 1; }
+    run_step 03_mmlong2  "$SD/03_mmlong2"  "$SL" step_mmlong2           "$S" || return 1
+  else
+    run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong        "$S" || return 1
+    run_step 03_flye      "$SD/03_flye"      "$SL" step_flye            "$S" || return 1
+  fi
   run_step 05_quast     "$SD/05_quast"     "$SL" step_quast             "$S" || warn "QUAST failed for $S (continuing)"
   run_step 06_checkm2   "$SD/06_checkm2"   "$SL" step_checkm2           "$S" || warn "CheckM2 failed for $S (continuing)"
   run_step 07_bakta     "$SD/07_bakta"     "$SL" step_bakta             "$S" || return 1
   run_step 08_antismash "$SD/08_antismash" "$SL" step_antismash         "$S" || return 1
   [[ $RUN_GECCO -eq 1 ]] && { run_step 09_gecco    "$SD/09_gecco"    "$SL" step_gecco "$S" || warn "GECCO failed for $S (continuing)"; }
   [[ $RUN_RGI   -eq 1 ]] && { run_step 10_rgi_card "$SD/10_rgi_card" "$SL" step_rgi   "$S" || warn "RGI failed for $S (continuing)"; }
+  [[ $RUN_DEEPBGC    -eq 1 ]] && { run_step 13_deepbgc     "$SD/13_deepbgc"     "$SL" step_deepbgc    "$S" || warn "DeepBGC failed for $S (continuing)"; }
+  [[ $RUN_BGCPROPHET -eq 1 ]] && { run_step 14_bgc_prophet "$SD/14_bgc_prophet" "$SL" step_bgcprophet "$S" || warn "BGC-Prophet failed for $S (continuing)"; }
+  run_step 15_mibig "$SD/15_mibig" "$SL" step_mibig "$S" || warn "MIBiG comparison failed for $S (continuing; only antiSMASH BGCs get a MIBiG hit)"
   log "=== Isolate $S finished ==="
 }
 
@@ -574,7 +687,7 @@ step_summary() {
   if [[ $DRY_RUN -eq 1 ]]; then echo "    [dry-run] python3 <summary> $names" >&2; return 0; fi
   write_summary_py "$CL/summary.py"
   python3 "$CL/summary.py" --results "$RESULTS_DIR" --samples "$names" \
-    --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" \
+    --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" >>"$STEP_LOG" 2>&1
 }
 
@@ -586,7 +699,8 @@ process_combined() {
   [[ $RUN_BIGSCAPE -eq 1 ]] && { run_step bigscape "$COMBINED_DIR/bigscape" "$CL" step_bigscape combined || warn "BiG-SCAPE failed (continuing)"; }
   FORCE_STEPS+=(summary)                       # always rebuild the summary
   run_step summary "$COMBINED_DIR/summary" "$CL" step_summary combined || return 1
-  log "Results: $COMBINED_DIR/summary/bgc_summary.tsv (all BGCs, ranked)"
+  log "Results: $COMBINED_DIR/summary/master_summary.tsv (all tools merged per BGC locus, ranked)"
+  log "         $COMBINED_DIR/summary/per_tool/ (one table per BGC finder, with MIBiG hits)"
 }
 
 # =============================================================================
@@ -604,6 +718,22 @@ do_setup() {
     "$CONDA_CREATE" create -y -p "$ENV_DIR/$env" -c conda-forge -c bioconda ${ENV_PACKAGES[$env]} \
       >>"$MAIN_LOG" 2>&1 || { warn "  $env: install FAILED (see $MAIN_LOG)"; fail=1; }
   done
+
+  # mmlong2 downloads its Singularity containers (several GB, from Zenodo) the first time it
+  # runs. Compute nodes often have no internet, so trigger that here with a tiny dry run.
+  if [[ "$ASSEMBLER" == mmlong2 && -z "$MMLONG2_CMD" && "$MMLONG2_CONTAINER" -eq 1 ]]; then
+    local mmbin="$ENV_DIR/mmlong2/bin"
+    if [[ -d "$mmbin/sing-mmlong2-lite" ]]; then log "  mmlong2 container: present"
+    elif [[ -d "$ENV_DIR/mmlong2/conda-meta" ]]; then
+      log "  mmlong2 container: downloading (one time, several GB)..."
+      local init="$SETUP_DIR/mmlong2_init"; mkdir -p "$init"
+      printf '@r1\nACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIII\n' >"$init/tiny.fastq"
+      run_in_env mmlong2 bash -c 'cd "$1" && mmlong2-lite -np tiny.fastq -o init_test -n -run assembly' \
+        _ "$init" || true
+      if [[ -d "$mmbin/sing-mmlong2-lite" ]]; then log "  mmlong2 container: ok"; rm -rf "$init"
+      else warn "mmlong2 container download FAILED (see $MAIN_LOG). Note: mmlong2 needs >= 100 GB free disk space"; fail=1; fi
+    fi
+  fi
 
   # Links to every BioCloud database (only for finding them; the pipeline reads the SHARED_* paths)
   if [[ -n "$SHARED_DB_ROOT" && -d "$SHARED_DB_ROOT" ]]; then
@@ -672,12 +802,41 @@ do_setup() {
     fi
   fi
 
+  # DeepBGC: models + its own Pfam 31 (~0.5 GB) into our folder (default would be ~/.local/share)
+  if [[ $RUN_DEEPBGC -eq 1 ]]; then
+    if [[ -n "$(find -L "$DEEPBGC_DB" -name '*.pkl' 2>/dev/null | head -n 1)" ]]; then log "  DeepBGC: present ($DEEPBGC_DB)"
+    else
+      mkdir -p "$DEEPBGC_DB"
+      run_in_env deepbgc bash -c 'export DEEPBGC_DOWNLOADS_DIR="$1"; deepbgc download' _ "$DEEPBGC_DB" \
+        || { warn "DeepBGC models FAILED"; fail=1; }
+    fi
+  fi
+
+  # BGC-Prophet: its two models (GitHub) + the ESM-2 8M protein model it builds on (~30 MB,
+  # fetched by torch on first use, so done here because compute nodes may have no internet)
+  if [[ $RUN_BGCPROPHET -eq 1 ]]; then
+    if [[ -n "$(bgcprophet_model_dir)" ]]; then log "  BGC-Prophet models: present ($(bgcprophet_model_dir))"
+    else
+      mkdir -p "$BGCPROPHET_DB"
+      ( cd "$BGCPROPHET_DB" && curl -fsSL "$BGCPROPHET_MODEL_URL" -o model.tar.gz && tar -xzf model.tar.gz ) \
+        && [[ -n "$(bgcprophet_model_dir)" ]] || { warn "BGC-Prophet models FAILED"; fail=1; }
+    fi
+    if [[ -n "$(find -L "$BGCPROPHET_DB/torch" -name 'esm2_t6_8M_UR50D*' 2>/dev/null | head -n 1)" ]]; then log "  ESM-2 (BGC-Prophet): present"
+    else
+      run_in_env bgcprophet bash -c 'export TORCH_HOME="$1"; python -c "import esm; esm.pretrained.esm2_t6_8M_UR50D()"' \
+        _ "$BGCPROPHET_DB/torch" || { warn "ESM-2 download for BGC-Prophet FAILED"; fail=1; }
+    fi
+  fi
+
   log "Databases in use:"
   log "  antiSMASH  $(antismash_db_path)"
+  log "  MIBiG      $(kcb_dir)   (antiSMASH KnownClusterBlast data, used for every tool)"
   log "  Bakta      $(bakta_db_path)"
   log "  CheckM2    $(checkm2_dmnd)"
   log "  CARD       $CARD_DB/localDB"
   [[ $RUN_GTDBTK -eq 1 ]] && log "  GTDB-Tk    $(gtdbtk_db_path)"
+  [[ $RUN_DEEPBGC -eq 1 ]] && log "  DeepBGC    $DEEPBGC_DB"
+  [[ $RUN_BGCPROPHET -eq 1 ]] && log "  BGC-Prophet $(bgcprophet_model_dir)"
   if [[ $fail -eq 0 ]]; then
     log "Setup complete. Put reads in $RAW_DIR, then: bash $SCRIPT_PATH run --dry-run"
   else
@@ -725,7 +884,7 @@ do_submit() {
 # =============================================================================
 write_summary_py() {
 cat >"$1" <<'PYTHON'
-import argparse, csv, glob, json, os, re, shutil, sys
+import argparse, csv, glob, json, os, re, sys
 from collections import defaultdict
 
 NA = "NA"
@@ -755,15 +914,21 @@ def overlap(a1, a2, b1, b2):
 
 def genome_info(sd, s):
     g = {"isolate": s}
-    for r in read_tsv(os.path.join(sd, "02_filtlong", "read_stats.tsv")):
+    rs = os.path.join(sd, "02_filtlong", "read_stats.tsv")
+    if not os.path.isfile(rs):
+        rs = os.path.join(sd, "03_mmlong2", "read_stats.tsv")
+    for r in read_tsv(rs):
         tag = "filtered" if "filtered" in pick(r, "file") else "raw"
         g[f"{tag}_reads"] = pick(r, "num_seqs"); g[f"{tag}_bases"] = pick(r, "sum_len")
         g[f"{tag}_read_N50"] = pick(r, "N50"); g[f"{tag}_meanQ"] = pick(r, "AvgQual")
-    q = {r.get("Assembly"): r.get("polished", NA) for r in read_tsv(os.path.join(sd, "05_quast", "report.tsv"))}
+    # "polished" = column name in results made before v3.3.0
+    q = {r.get("Assembly"): r.get("final", r.get("polished", NA)) for r in read_tsv(os.path.join(sd, "05_quast", "report.tsv"))}
     g.update({"genome_length": q.get("Total length", NA), "contigs": q.get("# contigs", NA),
               "N50": q.get("N50", NA), "GC_percent": q.get("GC (%)", NA)})
     contigs = []
     info = os.path.join(sd, "03_flye", "assembly_info.txt")
+    if not os.path.isfile(info):
+        info = os.path.join(sd, "03_mmlong2", "assembly_info.txt")
     if os.path.isfile(info):
         for line in open(info):
             if line.startswith("#") or not line.strip():
@@ -826,10 +991,209 @@ def gecco(sd):
     for r in read_tsv(p[0] if p else None):
         try:
             out.append({"contig": pick(r, "sequence_id"), "id": pick(r, "cluster_id", "bgc_id"),
-                        "start": int(pick(r, "start")), "end": int(pick(r, "end")), "type": pick(r, "type")})
+                        "start": int(pick(r, "start")), "end": int(pick(r, "end")), "type": pick(r, "type"),
+                        "average_p": pick(r, "average_p"), "max_p": pick(r, "max_p")})
         except ValueError:
             pass
     return out
+
+
+def deepbgc(sd):
+    p = sorted(glob.glob(os.path.join(sd, "13_deepbgc", "*.bgc.tsv")))
+    out = []
+    for r in read_tsv(p[0] if p else None):
+        try:
+            out.append({"contig": pick(r, "sequence_id"), "id": pick(r, "bgc_candidate_id"),
+                        "start": int(pick(r, "nucl_start")) + 1, "end": int(pick(r, "nucl_end")),   # 0-based start
+                        "deepbgc_score": pick(r, "deepbgc_score"), "deepbgc_class": pick(r, "product_class"),
+                        "deepbgc_activity": pick(r, "product_activity"),
+                        **{f"deepbgc_{k}": pick(r, k) for k in ("antibacterial", "antifungal", "cytotoxic", "inhibitor")}})
+        except ValueError:
+            pass
+    return out
+
+
+def bakta_genes(sd, s):
+    """locus tag -> (contig, start, end) from Bakta's .tsv (columns: contig, type, start, stop, strand, locus tag)"""
+    genes = {}
+    p = os.path.join(sd, "07_bakta", f"{s}.tsv")
+    if os.path.isfile(p):
+        for line in open(p):
+            f = line.rstrip("\n").split("\t")
+            if line.startswith("#") or len(f) < 6 or not f[5]:
+                continue
+            try:
+                genes[f[5]] = (f[0], int(f[2]), int(f[3]))
+            except ValueError:
+                pass
+    return genes
+
+
+def bgc_prophet(sd, s, genes):
+    """BGC-Prophet gives each BGC as a list of gene IDs (Bakta locus tags) -> turn into coordinates"""
+    p = os.path.join(sd, "14_bgc_prophet", f"{s}_classified.csv")
+    if not os.path.isfile(p):
+        return []
+    out, seen = [], set()
+    for r in csv.DictReader(open(p, newline="")):
+        if r.get("isBGC") != "Yes":
+            continue
+        loc = [genes[g] for g in re.findall(r"[^\s\[\]',\"]+", r.get("sentence") or "") if g in genes]
+        if not loc:
+            continue
+        contig = max({c for c, _, _ in loc}, key=[c for c, _, _ in loc].count)   # the 128-gene windows can cross contigs
+        key = (contig, min(a for c, a, _ in loc if c == contig), max(b for c, _, b in loc if c == contig))
+        if key in seen:                                     # the last window overlaps the one before
+            continue
+        seen.add(key)
+        out.append({"contig": key[0], "id": r.get("ID", NA), "start": key[1], "end": key[2],
+                    "bgc_prophet_class": r.get("labels", NA), "bgc_prophet_probability": r.get("probability", NA)})
+    return out
+
+
+MIN_IDENT, MIN_COVER = 45, 40   # same cut-offs as antiSMASH KnownClusterBlast (exclusive lower bounds)
+
+
+def mibig_refs(d):
+    """MIBiG cluster ('BGC0000001|c1') -> (compound, set of its protein IDs), from KnownClusterBlast clusters.txt"""
+    refs = {}
+    p = os.path.join(d, "clusters.txt") if d else ""
+    if os.path.isfile(p):
+        for line in open(p, encoding="utf-8"):
+            t = line.rstrip("\n").split("\t")
+            if len(t) >= 6:
+                refs[f"{t[0]}|{t[2]}"] = (t[1], {x for x in t[5].split(";") if x})
+    return refs
+
+
+def mibig_hits(sd, s):
+    """Bakta locus tag -> set of (MIBiG cluster, MIBiG protein) it hits (DIAMOND, KnownClusterBlast cut-offs)"""
+    hits = defaultdict(set)
+    p = os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv")
+    if os.path.isfile(p):
+        for line in open(p):
+            f = line.rstrip("\n").split("\t")
+            if len(f) < 6:
+                continue
+            q, subj, ident, alen, qlen = f[0], f[1].split("|"), float(f[2]), float(f[3]), float(f[4])
+            if len(subj) < 5 or ident <= MIN_IDENT or 100 * alen / qlen <= MIN_COVER:
+                continue
+            shift = 1 if subj[4].startswith("linearised") else 0   # as antiSMASH parses these headers
+            hits[q].add((f"{subj[0]}|{subj[1]}", subj[4 + shift]))
+    return hits
+
+
+def best_mibig(contig, start, end, genes, hits, refs):
+    """KnownClusterBlast-style best MIBiG match for one BGC: % of the MIBiG cluster's genes hit"""
+    per_ref = defaultdict(set)
+    for tag, (c, a, b) in genes.items():
+        if c == contig and overlap(a, b, start, end):
+            for ref, prot in hits.get(tag, ()):
+                per_ref[ref].add(prot)
+    best = None
+    for ref, prots in per_ref.items():
+        if ref not in refs or not refs[ref][1]:
+            continue
+        sim = int(100 * len(prots & refs[ref][1]) / len(refs[ref][1]))
+        if best is None or (sim, len(prots)) > (best[2], best[3]):
+            best = (ref.split("|")[0], refs[ref][0], sim, len(prots))
+    return best
+
+
+def merge_loci(bgcs):
+    """group predictions of all tools that overlap on the same contig into one locus"""
+    loci = []
+    for b in sorted(bgcs, key=lambda x: (x["contig"], x["start"])):
+        if loci and loci[-1]["contig"] == b["contig"] and b["start"] <= loci[-1]["end"]:
+            loci[-1]["end"] = max(loci[-1]["end"], b["end"]); loci[-1]["members"].append(b)
+        else:
+            loci.append({"contig": b["contig"], "start": b["start"], "end": b["end"], "members": [b]})
+    return loci
+
+
+TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
+QC_TAX = ["genome_length", "contigs", "N50", "GC_percent", "mean_depth", "circular_contigs", "completeness",
+          "contamination", "gtdb_classification", "closest_reference", "closest_ANI", "possible_new_species"]
+ANTIBIOTIC_WORDS = {"NRPS", "PKS", "NRP", "Polyketide", "RiPP"}   # antiSMASH classes + DeepBGC/GECCO/BGC-Prophet classes
+
+
+def fnum(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def tool_calls(s, regions, gec, dbg, pro, genes, hits, refs, mibig_ran):
+    """one row per BGC per tool, all with the same MIBiG columns"""
+    calls = []
+    for tool, rows in zip(TOOLS, (regions, gec, dbg, pro)):
+        for r in rows:
+            c = {"isolate": s, "tool": tool, "bgc_id": r.get("region", r.get("id")), "contig": r["contig"],
+                 "start": r["start"], "end": r["end"], "length_kb": round((r["end"] - r["start"] + 1) / 1000, 1)}
+            if tool == "antismash":
+                c.update(antismash_type=r["bgc_type"], antismash_class=r["bgc_class"], contig_edge=r["contig_edge"])
+            elif tool == "gecco":
+                c.update(gecco_type=r["type"], gecco_average_p=r["average_p"], gecco_max_p=r["max_p"])
+            else:
+                c.update({k: v for k, v in r.items() if k.startswith(tool + "_")})
+            if tool == "antismash" and r["closest_MIBiG"] != NA:      # antiSMASH's own KnownClusterBlast hit
+                mib = (r["closest_MIBiG"], r["closest_MIBiG_compound"], r["MIBiG_similarity_pct"], "antiSMASH KnownClusterBlast")
+            else:
+                b = best_mibig(c["contig"], c["start"], c["end"], genes, hits, refs)
+                mib = (b[0], b[1], b[2], "DIAMOND vs KnownClusterBlast data") if b else \
+                      (NA, NA, NA, "no MIBiG hit" if mibig_ran else "not_run")
+            c.update(zip(("MIBiG_accession", "MIBiG_compound", "MIBiG_similarity_pct", "MIBiG_method"), mib))
+            calls.append(c)
+    return calls
+
+
+def master_rows(s, g, calls, res, fam, members, bs_ran, known, related):
+    """merge overlapping predictions of all tools into loci, score and describe each locus"""
+    rows = []
+    for n, L in enumerate(merge_loci(calls), start=1):
+        m, lid = L["members"], f"{s}_locus{n:03d}"
+        for c in m:
+            c["locus_id"] = lid
+        tools = sorted({c["tool"] for c in m}, key=TOOLS.index)
+
+        def vals(k):
+            return ";".join(sorted({str(c[k]) for c in m if c.get(k) not in (None, "", NA)})) or NA
+
+        best = max((c for c in m if fnum(c["MIBiG_similarity_pct"]) is not None),
+                   key=lambda c: fnum(c["MIBiG_similarity_pct"]), default=None)
+        sim = fnum(best["MIBiG_similarity_pct"]) if best else 0.0
+        rh = [h for h in res if h["contig"] == L["contig"] and overlap(h["start"], h["end"], L["start"], L["end"])]
+        keys = [fam.get(f"{s}__{c['bgc_id']}") for c in m if c["tool"] == "antismash"]
+        keys = [k for k in keys if k]
+        fam_mibig = sorted({x for k in keys for x in members[k] if x.startswith("BGC")})
+        novelty = "known" if sim >= known else ("related" if sim >= related or fam_mibig else "novel_candidate")
+        words = set(re.split(r"[+;,\s]+", " ".join(vals(k) for k in
+                    ("antismash_class", "gecco_type", "deepbgc_class", "bgc_prophet_class"))))
+        activity = max([fnum(c.get(k)) or 0 for c in m for k in ("deepbgc_antibacterial", "deepbgc_antifungal")], default=0)
+        edge = any(c.get("contig_edge") == "yes" for c in m)
+        # ranking: novelty (3/1/0) + antibiotic-type class (2) + each extra tool that agrees (1)
+        #          + resistance gene inside (2) + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
+        score = {"novel_candidate": 3, "related": 1, "known": 0}[novelty] + (2 if words & ANTIBIOTIC_WORDS else 0) \
+            + (len(tools) - 1) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
+        rows.append({"priority_score": score, "novelty": novelty, "isolate": s, "locus_id": lid,
+                     "contig": L["contig"], "start": L["start"], "end": L["end"],
+                     "length_kb": round((L["end"] - L["start"] + 1) / 1000, 1),
+                     "n_tools": len(tools), "tools": ";".join(tools),
+                     "antismash_regions": ";".join(c["bgc_id"] for c in m if c["tool"] == "antismash") or NA,
+                     **{k: vals(k) for k in ("antismash_type", "antismash_class", "gecco_type", "deepbgc_class",
+                                             "deepbgc_activity", "bgc_prophet_class")},
+                     "deepbgc_max_antibacterial_or_antifungal": round(activity, 3) if "deepbgc" in tools else NA,
+                     "contig_edge": "yes" if edge else ("no" if "antismash" in tools else NA),
+                     "closest_MIBiG": best["MIBiG_accession"] if best else NA,
+                     "closest_MIBiG_compound": best["MIBiG_compound"] if best else NA,
+                     "MIBiG_similarity_pct": best["MIBiG_similarity_pct"] if best else NA,
+                     "MIBiG_from": f"{best['tool']} ({best['MIBiG_method']})" if best else NA,
+                     "resistance_gene_in_locus": ";".join(f"{h['gene']} ({h['drug']})" for h in rh) or "none",
+                     "bigscape_family": ";".join(sorted({k[1] for k in keys})) or (NA if bs_ran else "not_run"),
+                     "family_MIBiG_members": ";".join(fam_mibig) or ("none" if keys else NA),
+                     **{k: g.get(k, NA) for k in QC_TAX}})
+    return rows
 
 
 def rgi(sd, s):
@@ -889,19 +1253,30 @@ def main():
     ap.add_argument("--results", required=True); ap.add_argument("--samples", required=True)
     ap.add_argument("--out", required=True); ap.add_argument("--cutoff", default="0.30")
     ap.add_argument("--known", type=float, default=80); ap.add_argument("--related", type=float, default=30)
+    ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
     comb = os.path.join(a.results, "_combined")
     taxa = gtdb(comb)
     fam, members, bs_ran = bigscape(comb, a.cutoff)
-    genomes, bgcs = [], []
+    refs = mibig_refs(a.mibig)
+    genomes, bgcs, calls, master = [], [], [], []
 
     for s in [x for x in a.samples.split(",") if x]:
         sd = os.path.join(a.results, s)
         regions, gec, res = antismash_regions(sd, s), gecco(sd), rgi(sd, s)
+        genes = bakta_genes(sd, s)
+        dbg, pro = deepbgc(sd), bgc_prophet(sd, s, genes)
         g = genome_info(sd, s)
         g.update(taxa.get(s, {}))
-        g.update({"BGCs_antismash": len(regions), "BGCs_gecco": len(gec), "resistance_genes": len(res)})
+        g.update({"BGCs_antismash": len(regions), "BGCs_gecco": len(gec), "BGCs_deepbgc": len(dbg),
+                  "BGCs_bgc_prophet": len(pro), "resistance_genes": len(res)})
         genomes.append(g)
+
+        mibig_ran = os.path.isfile(os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv"))
+        tc = tool_calls(s, regions, gec, dbg, pro, genes, mibig_hits(sd, s), refs, mibig_ran)
+        loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related)
+        g["BGC_loci_all_tools"] = len(loci)
+        calls += tc; master += loci
 
         used = set()
         for r in regions:
@@ -942,7 +1317,11 @@ def main():
     bgcs.sort(key=lambda r: (-r["priority_score"], -float(r["length_kb"])))
     bgcs = [{"rank": i, **r} for i, r in enumerate(bgcs, start=1)]
     write(os.path.join(a.out, "genome_summary.tsv"), genomes)
-    write(os.path.join(a.out, "bgc_summary.tsv"), bgcs)
+    write(os.path.join(a.out, "bgc_summary.tsv"), bgcs)            # antiSMASH-based ranking (as before v3.3.0)
+    for t in TOOLS:
+        write(os.path.join(a.out, "per_tool", f"{t}_bgcs.tsv"), [c for c in calls if c["tool"] == t])
+    master.sort(key=lambda r: (-r["priority_score"], -r["n_tools"], -r["length_kb"]))
+    write(os.path.join(a.out, "master_summary.tsv"), [{"rank": i, **r} for i, r in enumerate(master, start=1)])
 
     # per-isolate copies: results/<isolate>/11_gtdbtk and 12_novelty
     for g in genomes:
@@ -952,8 +1331,9 @@ def main():
         write(os.path.join(a.results, s, "11_gtdbtk", f"{s}_taxonomy.tsv"),
               [{k: g.get(k, NA) for k in ("isolate", "gtdb_classification", "closest_reference",
                                           "closest_ANI", "possible_new_species")}])
-    n_new = sum(b["novelty"] == "novel_candidate" for b in bgcs)
-    print(f"{len(genomes)} genomes, {len(bgcs)} BGCs, {n_new} novel candidates -> {a.out}", file=sys.stderr)
+    n_new = sum(b["novelty"] == "novel_candidate" for b in master)
+    print(f"{len(genomes)} genomes, {len(calls)} BGC calls from {len(TOOLS)} tools = {len(master)} loci, "
+          f"{n_new} novel candidates -> {a.out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
