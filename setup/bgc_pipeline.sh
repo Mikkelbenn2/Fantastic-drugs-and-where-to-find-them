@@ -24,7 +24,8 @@
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
-#    3.4.0  2026-11-07  A finished genome (.fasta/.fna/.fa, may be .gz) in raw_data/ is used as is:
+#    3.4.0  2026-11-07  mmlong2 removed (it belongs to metagenome_pipeline.sh): reads -> Filtlong ->
+#                       Flye is the only assembly route. A finished genome (.fasta/.fna/.fa, may be .gz) in raw_data/ is used as is:
 #                       read QC and assembly are skipped (03_genome). Used for the controls,
 #                       which are now the real published NCBI genomes instead of simulated reads.
 #    3.3.0  2026-11-06  Two more BGC finders: DeepBGC (13_deepbgc) and BGC-Prophet (14_bgc_prophet).
@@ -66,26 +67,11 @@
 
 THREADS=16                     # CPUs per program (inside Slurm: taken from the job)
 
-# Which route turns reads into a genome (no polishing in either route):
-#   "mmlong2" = mmlong2-lite (AAU, Sereika et al.) does it in ONE step:
-#               metaFlye assembly -> removal of misassemblies (curation).
-#               The pipeline stops mmlong2 there (-run curation); binning is not used.
-#   "flye"    = the earlier route: Filtlong -> Flye as separate steps.
-ASSEMBLER="mmlong2"
-MMLONG2_INPUT="raw"            # "raw" = all reads straight into mmlong2.
-                               # "filtered" = Filtlong first (the mmlong2 FAQ recommends removing
-                               # low-quality reads before mmlong2).
-MMLONG2_CMD=""                 # empty = use the pipeline's own install (setup/envs/mmlong2).
-                               # Or the path/name of an mmlong2-lite already on the server.
-MMLONG2_CONTAINER=1            # 1 = mmlong2's Singularity container (default, downloaded once in
-                               # "setup"); 0 = conda environments instead (-env)
-MMLONG2_KEEP_TMP=0             # 1 = keep mmlong2's large temporary files (BAM files etc.)
+# Reads -> genome: Filtlong -> Flye (no polishing). mmlong2 is only used by metagenome_pipeline.sh.
 
 # Reads. "nano-hq" = R10.4.1 + Dorado hac/sup (Q15-20+). Use "nano-raw" for old R9.4.1 data.
 # Without polishing, R10.4.1 reads should be basecalled with Dorado "sup" (Q20+); older/noisier
 # reads give frameshifts in long NRPS/PKS genes.
-# FLYE_READ_MODE and GENOME_SIZE are only used by ASSEMBLER="flye" (mmlong2 always uses
-# --nano-hq --meta). The FILTLONG_* settings are used by "flye" and by MMLONG2_INPUT="filtered".
 FLYE_READ_MODE="nano-hq"
 GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it
 FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)
@@ -168,7 +154,6 @@ SLURM_COMBINED_CPUS=32; SLURM_COMBINED_MEM="128G"; SLURM_COMBINED_TIME="1-00:00:
 declare -A ENV_PACKAGES=(
   [reads]="nanoplot>=1.42 filtlong>=0.2.1 seqkit>=2.8"
   [flye]="flye>=2.9.5"
-  [mmlong2]="mmlong2-lite"       # only used when ASSEMBLER="mmlong2"
   [quast]="quast>=5.2 python=3.11"   # QUAST still imports distutils, which Python 3.12+ removed
   [checkm2]="checkm2>=1.0.2"
   [bakta]="bakta>=1.10"
@@ -385,14 +370,8 @@ set_sample() {
   SD="$RESULTS_DIR/$S"; SL="$SD/logs"
   READS="$SD/01_nanoplot/$S.reads.fastq.gz"   # all reads joined
   FILT="$SD/02_filtlong/$S.filtered.fastq.gz"
-  if [[ "$ASSEMBLER" == mmlong2 ]]; then
-    MM="$SD/03_mmlong2"
-    DRAFT="$MM/draft_assembly.fasta"       # metaFlye assembly before curation
-    GENOME="$MM/$S.fasta"                  # curated = final genome
-  else
-    DRAFT="$SD/03_flye/assembly.fasta"
-    GENOME="$SD/03_flye/$S.fasta"          # final genome used by all later steps
-  fi
+  DRAFT="$SD/03_flye/assembly.fasta"
+  GENOME="$SD/03_flye/$S.fasta"            # final genome used by all later steps
   if is_genome_input; then DRAFT="$SD/03_genome/$S.fasta"; GENOME="$DRAFT"; fi
   GBFF="$SD/07_bakta/$S.gbff"
 }
@@ -461,44 +440,7 @@ step_flye() {
   need "$GENOME"
 }
 
-# 03 mmlong2-lite — assembly + curation in one go (ASSEMBLER="mmlong2"), without Medaka.
-#   metaFlye (--nano-hq --meta): the --meta mode copes with uneven coverage, e.g. plasmids
-#            that have many more copies than the chromosome.
-#   Curation: maps the reads back and cuts contigs where reads suggest a misassembly
-#            (zero coverage or many clipped reads), so a false join cannot create a fake BGC.
-# "-run curation" stops mmlong2 before eukaryote filtering and binning, which an isolate does not
-# need. Note: the mmlong2 FAQ says the workflow is built for complex metagenomes and is "not
-# optimal" for pure cultures; check QUAST/CheckM2 against the "flye" route on one isolate.
-step_mmlong2() {
-  local input="$READS" run="$MM/run"
-  if [[ "$MMLONG2_INPUT" == filtered ]]; then input="$FILT"
-  else [[ $DRY_RUN -eq 1 || -s "$READS" ]] || join_reads || return 1; fi
-  local args=(-np "$input" -o "$run" -p "$THREADS" -run curation -tmp "$MM/tmp")   # no -med = no Medaka
-  [[ "$MMLONG2_CONTAINER" -eq 0 ]] && args+=(-env)
-  [[ $DRY_RUN -eq 0 ]] && mkdir -p "$MM/tmp"
-  # mmlong2 checks for >= 100 GB free space in the folder it is started from -> start it in $MM.
-  if [[ -n "$MMLONG2_CMD" ]]; then
-    run_plain bash -c 'cd "$1" && shift && "$@"' _ "$MM" "$MMLONG2_CMD" "${args[@]}"
-  else
-    run_in_env mmlong2 bash -c 'cd "$1" && shift && mmlong2-lite "$@"' _ "$MM" "${args[@]}"
-  fi || warn "mmlong2 ended with an error for $S — checking whether the genome was still made"
-  [[ $DRY_RUN -eq 1 ]] && return 0
-  local final="$run/tmp/curation/asm_curated.fasta"
-  [[ -s "$final" ]] || { log "    mmlong2 made no curated assembly — see $STEP_LOG and $run/"; return 1; }
-  cp "$final" "$GENOME"
-  cp "$run/tmp/assembly/assembly.fasta" "$DRAFT" 2>/dev/null
-  cp "$run/tmp/assembly/assembly_info.txt" "$MM/assembly_info.txt" 2>/dev/null
-  # read numbers for the summary table (Filtlong normally makes these)
-  run_in_env reads bash -c 'seqkit stats -a -T -j "$1" "$2" > "$3"' \
-    _ "$THREADS" "$input" "$MM/read_stats.tsv"
-  if [[ "$MMLONG2_KEEP_TMP" -eq 0 ]]; then
-    rm -rf "$MM/tmp"; find "$run" -name '*.bam*' -delete 2>/dev/null
-  fi
-  need "$GENOME"
-}
-
-# 05 QUAST — contiguity: number of contigs, total length, N50, GC%; draft vs. final
-# (identical in the "flye" route; after curation in the "mmlong2" route).
+# 05 QUAST — contiguity: number of contigs, total length, N50, GC% (draft = final: no polishing).
 step_quast() {
   run_in_env quast quast.py -o "$SD/05_quast" -t "$THREADS" \
     --labels "draft,final" "$DRAFT" "$GENOME"
@@ -602,14 +544,8 @@ process_sample() {
     run_step 03_genome    "$SD/03_genome"    "$SL" step_genome          "$S" || return 1
   else
     run_step 01_nanoplot  "$SD/01_nanoplot"  "$SL" step_nanoplot          "$S" || warn "NanoPlot failed for $S (continuing)"
-    if [[ "$ASSEMBLER" == mmlong2 ]]; then
-      # no polishing, so there is no 04 folder in either route
-      [[ "$MMLONG2_INPUT" == filtered ]] && { run_step 02_filtlong "$SD/02_filtlong" "$SL" step_filtlong "$S" || return 1; }
-      run_step 03_mmlong2  "$SD/03_mmlong2"  "$SL" step_mmlong2           "$S" || return 1
-    else
-      run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong        "$S" || return 1
-      run_step 03_flye      "$SD/03_flye"      "$SL" step_flye            "$S" || return 1
-    fi
+    run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong          "$S" || return 1
+    run_step 03_flye      "$SD/03_flye"      "$SL" step_flye              "$S" || return 1   # no polishing: no 04 folder
   fi
   run_step 05_quast     "$SD/05_quast"     "$SL" step_quast             "$S" || warn "QUAST failed for $S (continuing)"
   run_step 06_checkm2   "$SD/06_checkm2"   "$SL" step_checkm2           "$S" || warn "CheckM2 failed for $S (continuing)"
@@ -735,22 +671,6 @@ do_setup() {
     "$CONDA_CREATE" create -y -p "$ENV_DIR/$env" -c conda-forge -c bioconda ${ENV_PACKAGES[$env]} \
       >>"$MAIN_LOG" 2>&1 || { warn "  $env: install FAILED (see $MAIN_LOG)"; fail=1; }
   done
-
-  # mmlong2 downloads its Singularity containers (several GB, from Zenodo) the first time it
-  # runs. Compute nodes often have no internet, so trigger that here with a tiny dry run.
-  if [[ "$ASSEMBLER" == mmlong2 && -z "$MMLONG2_CMD" && "$MMLONG2_CONTAINER" -eq 1 ]]; then
-    local mmbin="$ENV_DIR/mmlong2/bin"
-    if [[ -d "$mmbin/sing-mmlong2-lite" ]]; then log "  mmlong2 container: present"
-    elif [[ -d "$ENV_DIR/mmlong2/conda-meta" ]]; then
-      log "  mmlong2 container: downloading (one time, several GB)..."
-      local init="$SETUP_DIR/mmlong2_init"; mkdir -p "$init"
-      printf '@r1\nACGTACGTACGTACGTACGT\n+\nIIIIIIIIIIIIIIIIIIII\n' >"$init/tiny.fastq"
-      run_in_env mmlong2 bash -c 'cd "$1" && mmlong2-lite -np tiny.fastq -o init_test -n -run assembly' \
-        _ "$init" || true
-      if [[ -d "$mmbin/sing-mmlong2-lite" ]]; then log "  mmlong2 container: ok"; rm -rf "$init"
-      else warn "mmlong2 container download FAILED (see $MAIN_LOG). Note: mmlong2 needs >= 100 GB free disk space"; fail=1; fi
-    fi
-  fi
 
   # Links to every BioCloud database (only for finding them; the pipeline reads the SHARED_* paths)
   if [[ -n "$SHARED_DB_ROOT" && -d "$SHARED_DB_ROOT" ]]; then
@@ -933,7 +853,7 @@ def genome_info(sd, s):
     g = {"isolate": s}
     rs = os.path.join(sd, "02_filtlong", "read_stats.tsv")
     if not os.path.isfile(rs):
-        rs = os.path.join(sd, "03_mmlong2", "read_stats.tsv")
+        rs = os.path.join(sd, "03_mmlong2", "read_stats.tsv")   # results made before v3.4.0
     for r in read_tsv(rs):
         tag = "filtered" if "filtered" in pick(r, "file") else "raw"
         g[f"{tag}_reads"] = pick(r, "num_seqs"); g[f"{tag}_bases"] = pick(r, "sum_len")
@@ -945,7 +865,7 @@ def genome_info(sd, s):
     contigs = []
     info = os.path.join(sd, "03_flye", "assembly_info.txt")
     if not os.path.isfile(info):
-        info = os.path.join(sd, "03_mmlong2", "assembly_info.txt")
+        info = os.path.join(sd, "03_mmlong2", "assembly_info.txt")   # results made before v3.4.0
     if os.path.isfile(info):
         for line in open(info):
             if line.startswith("#") or not line.strip():

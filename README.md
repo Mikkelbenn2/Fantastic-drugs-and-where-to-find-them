@@ -27,7 +27,7 @@ The overalle work flow of the pipeline is portrayed below
 |---|---|---|---|---|
 | 1 | **NanoPlot** | Read length and quality plots | Catches a bad sequencing run before hours of assembly | `01_nanoplot/` |
 | 2 | **Filtlong** | Removes short and low-quality reads | Cleaner input gives a better assembly | `02_filtlong/` |
-| 3 | **mmlong2-lite** or **Flye** (`ASSEMBLER` setting) | De novo genome assembly (mmlong2 also removes misassemblies) | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_mmlong2/` or `03_flye/` |
+| 3 | **Flye** | De novo genome assembly (no polishing) | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_flye/` (or `03_genome/` when a finished genome was given) |
 | 5 | **QUAST** | Number of contigs, genome length, N50, GC% | Shows how complete the assembly is in one piece | `05_quast/` |
 | 6 | **CheckM2** | Completeness and contamination | Confirms the genome is complete (> 95 %) and the culture is pure (< 5 %) | `06_checkm2/` |
 | 7 | **Bakta** | Finds and names all genes | Every later tool uses the same gene calls (Bakta replaces Prokka, which is no longer maintained) | `07_bakta/` |
@@ -188,7 +188,6 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `GENOME_SIZE` | empty | You know it, e.g. `8m` for *Streptomyces* |
 | `FILTLONG_TARGET_BASES` | empty | Coverage is very deep (> 150x): cap it at about 100 × genome size |
 | `SHARED_GTDBTK_DB`, `SHARED_BAKTA_DB`, `SHARED_CHECKM2_DB`, `SHARED_ANTISMASH_DB` | AAU server: `/databases/...` | You are on another server: point them at its shared databases, or set `""` to let `setup` download them |
-| `ASSEMBLER` | `mmlong2` | Use `flye` for the separate Filtlong → Flye route |
 | `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_DEEPBGC`, `RUN_BGCPROPHET`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
 | `DEEPBGC_SCORE`, `BGCPROPHET_THRESHOLD`, `BGCPROPHET_CLASSIFY_T` | 0.5 | You want the ML tools stricter (higher) or looser (lower) |
 | `BGCPROPHET_DEVICE` | `cpu` | Your Slurm job has a GPU: use `cuda` |
@@ -243,7 +242,6 @@ Cite each program by its paper:
 - **NanoPlot:** De Coster & Rademakers (2023), *Bioinformatics* 39:btad311.
 - **Filtlong:** github.com/rrwick/Filtlong.
 - **Flye:** Kolmogorov et al. (2019), *Nat Biotechnol* 37:540–546.
-- **mmlong2:** Sereika et al. (2025), *Nat Microbiol* (github.com/Serka-M/mmlong2).
 - **QUAST:** Gurevich et al. (2013), *Bioinformatics* 29:1072–1075.
 - **CheckM2:** Chklovski et al. (2023), *Nat Methods* 20:1203–1212.
 - **Bakta:** Schwengers et al. (2021), *Microb Genom* 7:000685.
