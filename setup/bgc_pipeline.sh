@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.3.0
+#  Version       3.4.0
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,15 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.3.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.4.0  2026-11-07  A finished genome (.fasta/.fna/.fa, may be .gz) in raw_data/ is used as is:
+#                       read QC and assembly are skipped (03_genome). Used for the controls,
+#                       which are now the real published NCBI genomes instead of simulated reads.
 #    3.3.0  2026-11-06  Two more BGC finders: DeepBGC (13_deepbgc) and BGC-Prophet (14_bgc_prophet).
 #                       Every tool's BGCs are compared with MIBiG the same way (15_mibig: DIAMOND
 #                       against antiSMASH's KnownClusterBlast data, same cut-offs). New summaries:
@@ -180,8 +183,8 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.3.0"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-11-06"
+PIPELINE_VERSION="3.4.0"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-11-07"
 
 
 set -uo pipefail
@@ -357,6 +360,7 @@ run_step() {
 # ---------- find the isolates in raw_data/ ------------------------------------
 # Each FASTQ file = one isolate (name = file name without .fastq.gz etc.)
 # Each folder containing FASTQ files = one isolate (name = folder name)
+# Each FASTA file (.fasta/.fna/.fa, may be .gz) = a finished genome: no read QC or assembly
 find_samples() {
   [[ -d "$RAW_DIR" ]] || die "No raw_data folder found at $RAW_DIR"
   SAMPLES=(); SAMPLE_SRC=()
@@ -366,13 +370,13 @@ find_samples() {
     if [[ -d "$p" ]]; then
       compgen -G "$p/*.f*q*" >/dev/null || continue           # folder without FASTQ: ignore
     else
-      [[ "$name" =~ \.(fastq|fq)(\.gz)?$ ]] || continue
-      name=${name%.gz}; name=${name%.fastq}; name=${name%.fq}
+      [[ "$name" =~ \.(fastq|fq|fasta|fna|fa)(\.gz)?$ ]] || continue
+      name=${name%.gz}; name=${name%.*}
     fi
     name=${name//[^A-Za-z0-9._-]/_}                            # no spaces/odd characters
     SAMPLES+=("$name"); SAMPLE_SRC+=("$p")
   done < <(find "$RAW_DIR" -mindepth 1 -maxdepth 1 \( -type f -o -type d -o -type l \) | sort)
-  [[ ${#SAMPLES[@]} -gt 0 ]] || die "No FASTQ files or FASTQ folders found in $RAW_DIR"
+  [[ ${#SAMPLES[@]} -gt 0 ]] || die "No FASTQ files, FASTQ folders or genome FASTA files found in $RAW_DIR"
 }
 
 # Where the files of one isolate live (one place, used by every step)
@@ -389,7 +393,16 @@ set_sample() {
     DRAFT="$SD/03_flye/assembly.fasta"
     GENOME="$SD/03_flye/$S.fasta"          # final genome used by all later steps
   fi
+  if is_genome_input; then DRAFT="$SD/03_genome/$S.fasta"; GENOME="$DRAFT"; fi
   GBFF="$SD/07_bakta/$S.gbff"
+}
+is_genome_input() { [[ -f "$SRC" && "$SRC" =~ \.(fasta|fna|fa)(\.gz)?$ ]]; }
+
+# 03 genome — a finished genome was given instead of reads: copy it (unzipped) as the genome.
+step_genome() {
+  [[ $DRY_RUN -eq 1 ]] && return 0
+  if [[ "$SRC" == *.gz ]]; then gzip -dc "$SRC" >"$GENOME"; else cp "$SRC" "$GENOME"; fi
+  need "$GENOME"
 }
 
 # =============================================================================
@@ -585,14 +598,18 @@ process_sample() {
   set_sample "$1" "$2"
   log "=== Isolate $S ==="
   [[ $DRY_RUN -eq 0 ]] && mkdir -p "$SD" "$SL"
-  run_step 01_nanoplot  "$SD/01_nanoplot"  "$SL" step_nanoplot          "$S" || warn "NanoPlot failed for $S (continuing)"
-  if [[ "$ASSEMBLER" == mmlong2 ]]; then
-    # no polishing, so there is no 04 folder in either route
-    [[ "$MMLONG2_INPUT" == filtered ]] && { run_step 02_filtlong "$SD/02_filtlong" "$SL" step_filtlong "$S" || return 1; }
-    run_step 03_mmlong2  "$SD/03_mmlong2"  "$SL" step_mmlong2           "$S" || return 1
+  if is_genome_input; then
+    run_step 03_genome    "$SD/03_genome"    "$SL" step_genome          "$S" || return 1
   else
-    run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong        "$S" || return 1
-    run_step 03_flye      "$SD/03_flye"      "$SL" step_flye            "$S" || return 1
+    run_step 01_nanoplot  "$SD/01_nanoplot"  "$SL" step_nanoplot          "$S" || warn "NanoPlot failed for $S (continuing)"
+    if [[ "$ASSEMBLER" == mmlong2 ]]; then
+      # no polishing, so there is no 04 folder in either route
+      [[ "$MMLONG2_INPUT" == filtered ]] && { run_step 02_filtlong "$SD/02_filtlong" "$SL" step_filtlong "$S" || return 1; }
+      run_step 03_mmlong2  "$SD/03_mmlong2"  "$SL" step_mmlong2           "$S" || return 1
+    else
+      run_step 02_filtlong  "$SD/02_filtlong"  "$SL" step_filtlong        "$S" || return 1
+      run_step 03_flye      "$SD/03_flye"      "$SL" step_flye            "$S" || return 1
+    fi
   fi
   run_step 05_quast     "$SD/05_quast"     "$SL" step_quast             "$S" || warn "QUAST failed for $S (continuing)"
   run_step 06_checkm2   "$SD/06_checkm2"   "$SL" step_checkm2           "$S" || warn "CheckM2 failed for $S (continuing)"

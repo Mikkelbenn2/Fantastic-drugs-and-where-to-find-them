@@ -1,50 +1,40 @@
 #!/usr/bin/env bash
-# Downloads / simulates the positive and negative control read sets (see controls/README.md).
+# Downloads the positive and negative controls (see controls/README.md). All real, published data:
+#   genomes = the complete reference genome from NCBI (the pipeline uses a .fna as is: no assembly),
+#   reads   = a real R10.4.1 ONT run from ENA (goes through read QC + assembly like an isolate).
 #   bash controls/get_controls.sh OUT_DIR        e.g. ../controls_run/raw_data
-# Real reads come from ENA. Simulated reads: Badread (R10.4.1 "nanopore2023" model) on the
-# published complete genome from NCBI. Needs internet: run on the login node.
+# Needs internet: run on the login node. The genome files are the same as from
+#   datasets download genome accession ACC --include genome
 set -euo pipefail
 OUT=${1:?usage: bash controls/get_controls.sh OUT_DIR}
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV="$HERE/../setup/envs/badread"
-DEPTH=60x                      # coverage of the simulated read sets
-mkdir -p "$OUT" "$OUT/../control_genomes"
-GEN="$(cd "$OUT/../control_genomes" && pwd)"
+mkdir -p "$OUT"
 
-CONDA=$(command -v mamba || command -v micromamba || command -v conda) || { echo "conda/mamba not found (module load miniforge?)" >&2; exit 1; }
-[[ -d "$ENV/conda-meta" ]] || "$CONDA" create -y -p "$ENV" -c conda-forge -c bioconda badread >/dev/null
-
-# isolate name           NCBI assembly     (positive = BGCs from MIBiG expected; negative = none/known only)
-SIMULATED="
+# isolate name              NCBI assembly     (positive = MIBiG BGCs expected; negative = none/known only)
+GENOMES="
 pos_Bvelezensis_FZB42       GCF_000015785.2
 pos_Scoelicolor_A3-2        GCF_000203835.1
 pos_Pprotegens_Pf-5         GCF_000012265.1
 pos_Svenezuelae_ATCC10712   GCA_000253235.1
 neg_Buchnera_APS            GCF_000009605.1
-neg_Ecoli_K12_MG1655_sim    GCF_000005845.2
+neg_Ecoli_K12_MG1655_ref    GCF_000005845.2
 "
-# isolate name           ENA run           (E. coli K-12 MG1655 wild type, Kit14/R10.4.1, Dorado sup v5)
-REAL="
+# isolate name              ENA run           (E. coli K-12 MG1655 wild type, Kit14/R10.4.1, Dorado sup v5)
+READS="
 neg_Ecoli_K12_MG1655        SRR30993121
 "
 
 while read -r name acc; do
   [[ -n "$name" ]] || continue
-  [[ -s "$OUT/$name.fastq.gz" ]] && { echo "$name: present"; continue; }
-  fa="$GEN/$name.fna"
-  if [[ ! -s "$fa" ]]; then
-    echo "$name: downloading genome $acc"
-    curl -fsSL -o "$GEN/$name.zip" \
-      "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/$acc/download?include_annotation_type=GENOME_FASTA"
-    python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); open(sys.argv[2], "wb").write(b"".join(z.read(n) for n in z.namelist() if n.endswith(".fna")))' \
-      "$GEN/$name.zip" "$fa"
-    rm "$GEN/$name.zip"
-  fi
-  echo "$name: simulating $DEPTH reads"
-  "$CONDA" run -p "$ENV" badread simulate --reference "$fa" --quantity "$DEPTH" --seed 1 \
-    --error_model nanopore2023 --qscore_model nanopore2023 | gzip >"$OUT/$name.fastq.gz.part"
-  mv "$OUT/$name.fastq.gz.part" "$OUT/$name.fastq.gz"
-done <<<"$SIMULATED"
+  [[ -s "$OUT/$name.fna" ]] && { echo "$name: present"; continue; }
+  echo "$name: downloading genome $acc"
+  curl -fsSL -o "$OUT/$name.zip" \
+    "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/accession/$acc/download?include_annotation_type=GENOME_FASTA"
+  python3 -c 'import sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); open(sys.argv[2], "wb").write(b"".join(z.read(n) for n in z.namelist() if n.endswith(".fna")))' \
+    "$OUT/$name.zip" "$OUT/$name.fna.part"
+  rm "$OUT/$name.zip"
+  [[ -s "$OUT/$name.fna.part" ]] || { echo "$name: no genome FASTA in the download" >&2; exit 1; }
+  mv "$OUT/$name.fna.part" "$OUT/$name.fna"
+done <<<"$GENOMES"
 
 while read -r name run; do
   [[ -n "$name" ]] || continue
@@ -53,5 +43,5 @@ while read -r name run; do
   echo "$name: downloading $run"
   curl -fSL -o "$OUT/$name.fastq.gz.part" "https://$url"
   mv "$OUT/$name.fastq.gz.part" "$OUT/$name.fastq.gz"
-done <<<"$REAL"
-echo "Done: $(ls "$OUT"/*.fastq.gz | wc -l) control read sets in $OUT"
+done <<<"$READS"
+echo "Done: $(ls "$OUT"/*.fna "$OUT"/*.fastq.gz 2>/dev/null | wc -l) controls in $OUT"
