@@ -3,7 +3,7 @@
 # controls/control_panel.tsv). All real, published data:
 #   genomes = the complete reference genome from NCBI (the pipeline uses a .fna as is: no assembly),
 #   reads   = a real R10.4.1 ONT run from ENA (goes through read QC + assembly like an isolate).
-#   bash controls/get_controls.sh OUT_DIR        e.g. ../controls_run/raw_data
+#   bash controls/get_controls.sh OUT_DIR   (normally called by: bash setup/bgc_pipeline.sh controls)
 # Needs internet: run on the login node. The genome files are the same as from
 #   datasets download genome accession ACC --include genome
 set -euo pipefail

@@ -49,19 +49,17 @@ Every accession, genome paper and paper showing (non-)production is in **`contro
 
 ## How to run
 
-Run the controls in a **separate copy** of the repository, so they don't mix with your isolates. Re-use the installed programs and databases:
+The controls run with the normal pipeline script, from the main project folder. They get their own input folder `raw_data_controls/` and output folder `results_controls/`, so they never mix with your isolates in `raw_data/` and `results/`. They use the same installed programs and databases.
 
 ```bash
-git clone https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them controls_run
-ln -s "$PWD/Fantastic-drugs-and-where-to-find-them/setup/envs" controls_run/setup/envs
-ln -s "$PWD/Fantastic-drugs-and-where-to-find-them/setup/databases" controls_run/setup/databases
-bash controls_run/controls/get_controls.sh controls_run/raw_data      # needs internet; ~10 min (the E. coli reads are ~1 GB)
-bash controls_run/setup/bgc_pipeline.sh submit
-# when all jobs are done:
-python3 controls_run/controls/check_controls.py controls_run/results/_combined/summary
+cd /projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them
+bash setup/bgc_pipeline.sh controls --dry-run     # downloads the controls if missing (~10 min), shows what will run
+bash setup/bgc_pipeline.sh controls               # downloads if missing, then submits the Slurm jobs
+# when "squeue --me" shows no bgc_ jobs any more:
+bash setup/bgc_pipeline.sh check-controls
 ```
 
-The checker writes three tables into `controls_run/results/_combined/summary/` and also prints them:
+The checker writes three tables into `results_controls/_combined/summary/` and also prints them:
 
 | File | What it shows |
 |---|---|
@@ -69,7 +67,7 @@ The checker writes three tables into `controls_run/results/_combined/summary/` a
 | `controls_expected_bgcs.tsv` | Every expected MIBiG BGC, and which tools found it |
 | `controls_loci.tsv` | Every control: loci, novelty labels, best score, and `PASS`/`CHECK`/`NOT_IN_RUN` |
 
-If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results/slurm_logs/combined_*.out`.
+If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results_controls/slurm_logs/combined_*.out`.
 
 ## What counts as a pass
 

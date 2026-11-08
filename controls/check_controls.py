@@ -34,7 +34,7 @@ def write(name, header, table):
 master_file = os.path.join(summ, "master_summary.tsv")
 if not os.path.isfile(master_file):
     sys.exit(f"ERROR: {master_file} not found. The pipeline's combined/summary step has not finished: "
-             "check results/slurm_logs/combined_*.out and results/_combined/logs/summary.log")
+             "check slurm_logs/combined_*.out and _combined/logs/summary.log in that results folder")
 os.makedirs(out_dir, exist_ok=True)
 
 panel = {r["isolate"]: r for r in rows(os.path.join(here, "control_panel.tsv"))}

@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.4.0
+#  Version       3.4.1
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,15 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.1 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.4.1  2026-11-08  "controls" and "check-controls" commands: the controls run with this script
+#                       in raw_data_controls/ -> results_controls/. BGC_RAW_DIR / BGC_RESULTS_DIR
+#                       choose other input/output folders.
 #    3.4.0  2026-11-07  mmlong2 removed (it belongs to metagenome_pipeline.sh): reads -> Filtlong ->
 #                       Flye is the only assembly route. A finished genome (.fasta/.fna/.fa, may be .gz) in raw_data/ is used as is:
 #                       read QC and assembly are skipped (03_genome). Used for the controls,
@@ -59,6 +62,9 @@
 #
 #  Usage
 #    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
+#    Controls:  bash setup/bgc_pipeline.sh controls [--dry-run]   then, when the jobs are done:
+#               bash setup/bgc_pipeline.sh check-controls          (see controls/README.md)
+#    Other folders: BGC_RAW_DIR=/abs/raw BGC_RESULTS_DIR=/abs/results bash setup/bgc_pipeline.sh ...
 #    Full instructions: README.md
 # =============================================================================
 
@@ -168,8 +174,8 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.4.0"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-11-07"
+PIPELINE_VERSION="3.4.1"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-11-08"
 
 
 set -uo pipefail
@@ -180,8 +186,10 @@ set -uo pipefail
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SETUP_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_DIR="$(dirname "$SETUP_DIR")"
-RAW_DIR="$PROJECT_DIR/raw_data"
-RESULTS_DIR="$PROJECT_DIR/results"
+# Other input/output folders, e.g. for the controls (absolute paths):
+#   BGC_RAW_DIR=$PWD/raw_data_controls BGC_RESULTS_DIR=$PWD/results_controls bash setup/bgc_pipeline.sh submit
+RAW_DIR="${BGC_RAW_DIR:-$PROJECT_DIR/raw_data}"
+RESULTS_DIR="${BGC_RESULTS_DIR:-$PROJECT_DIR/results}"
 ENV_DIR="$SETUP_DIR/envs"
 DB_DIR="$SETUP_DIR/databases"
 COMBINED_DIR="$RESULTS_DIR/_combined"
@@ -806,11 +814,11 @@ do_submit() {
   jid=$(sbatch --parsable "${opts[@]}" --job-name bgc_isolates --array "1-$n" \
         --cpus-per-task "$SLURM_SAMPLE_CPUS" --mem "$SLURM_SAMPLE_MEM" --time "$SLURM_SAMPLE_TIME" \
         --output "$RESULTS_DIR/slurm_logs/isolate_%A_%a.out" \
-        --wrap "bash '$SCRIPT_PATH' run --array-task --no-combined") || die "sbatch failed"
+        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' run --array-task --no-combined") || die "sbatch failed"
   cid=$(sbatch --parsable "${opts[@]}" --job-name bgc_combined --dependency "afterany:$jid" \
         --cpus-per-task "$SLURM_COMBINED_CPUS" --mem "$SLURM_COMBINED_MEM" --time "$SLURM_COMBINED_TIME" \
         --output "$RESULTS_DIR/slurm_logs/combined_%j.out" \
-        --wrap "bash '$SCRIPT_PATH' combined") || die "sbatch failed"
+        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' combined") || die "sbatch failed"
   echo "Submitted: isolate array job $jid ($n isolates) and combined job $cid (starts after)."
   echo "Watch with: squeue --me      Logs: $RESULTS_DIR/slurm_logs/"
 }
@@ -1287,6 +1295,7 @@ usage() {   # prints the comment block at the top of this file (up to SETTINGS)
 }
 
 CMD=${1:-help}; shift || true
+ARGS=("$@")
 ONLY=""; ARRAY_TASK=0; DO_COMBINED=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -1334,6 +1343,13 @@ case "$CMD" in
     log "All done." ;;
   submit)
     find_samples; do_submit ;;
+  controls)   # positive/negative controls: own input + output folders, same pipeline
+    CTRL_RAW="$PROJECT_DIR/raw_data_controls" CTRL_RES="$PROJECT_DIR/results_controls"
+    bash "$PROJECT_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
+    next=submit; [[ $DRY_RUN -eq 1 ]] && next=run
+    BGC_RAW_DIR="$CTRL_RAW" BGC_RESULTS_DIR="$CTRL_RES" exec bash "$SCRIPT_PATH" "$next" "${ARGS[@]}" ;;
+  check-controls)
+    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" ;;
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;
 esac

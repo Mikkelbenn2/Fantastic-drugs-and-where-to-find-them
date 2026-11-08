@@ -209,7 +209,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Follow Slurm jobs | `squeue --me` and `tail -f results/slurm_logs/*.out` |
 | Find out why a step failed | `tail -n 30 results/<isolate>/logs/<step>.log` |
 | Check the summary code after editing it | `bash setup/tests/test_summary.sh` |
-| Validate the pipeline on known genomes | Positive and negative controls: see `controls/README.md` |
+| Validate the pipeline on known genomes | `bash setup/bgc_pipeline.sh controls`, then `bash setup/bgc_pipeline.sh check-controls` (see `controls/README.md`) |
 
 ---
 
@@ -266,13 +266,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.4.0 (last updated 2026-11-07) |
+| **Version** | 3.4.1 (last updated 2026-11-08) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.1: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
