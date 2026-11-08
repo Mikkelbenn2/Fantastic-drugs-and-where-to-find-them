@@ -37,3 +37,23 @@ pos_Svenezuelae_ATCC10712	positive	BGC0000563	venezuelin	ribosomal	NA	HQ328852.1
 pos_Svenezuelae_ATCC10712	positive	BGC0000893	chloramphenicol	NRPS	antibacterial,antiviral	FR845719.1
 pos_Svenezuelae_ATCC10712	positive	BGC0001801	thiazostatin;watasemycin A;watasemycin B;2-hydroxyphenylthiazoline enantiopyochelin;isopyochelin	NRPS	antibacterial,antifungal	FR845719.1
 pos_Svenezuelae_ATCC10712	positive	BGC0002578	gaburedin A;gaburedin B;gaburedin C;gaburedin D;gaburedin E;gaburedin F	other	NA	FR845719.1
+pos_Ecoli_Nissle1917	positive	BGC0000589	microcin M	ribosomal	surfactant	AJ586887.1
+pos_Serythraea_NRRL2338	positive	BGC0000055	erythromycin A, erythromycin B, erythromycin C, erythromycin D	PKS+saccharide	antibacterial,inhibitor	AM420293.1
+pos_Serythraea_NRRL2338	positive	BGC0000349	erythrochelin	NRPS	antibacterial,siderophore	AM420293.1
+pos_Serythraea_NRRL2338	positive	BGC0000513	Ery-9, Ery-6, Ery-8, Ery-7, Ery-5, Ery-4, Ery-3	ribosomal	NA	AM420293.1
+pos_Serythraea_NRRL2338	positive	BGC0000659	2-methylisoborneol	terpene	NA	AM420293.1
+pos_Serythraea_NRRL2338	positive	BGC0000902	flaviolin	PKS	NA	AM420293.1
+pos_Sgriseus_NBRC13350	positive	BGC0000282	2-methoxy-5-methyl-6-(13-methyltetradecyl)-1,4-benzoquinone, 2-methoxy-5-methyl-6-(13-methyltetradecyl)phenol	PKS	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000496	AmfS	ribosomal	morphogen	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000583	grisemycin	ribosomal	antibacterial	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000649	carotenoid	terpene	NA	AF272737.1
+pos_Sgriseus_NBRC13350	positive	BGC0000658	2-methylisoborneol	terpene	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000662	grixazone A	terpene	pigment	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000664	isorenieratene	terpene	antioxidant,pigment	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000724	streptomycin	saccharide	antibacterial	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000848	A-factor	other	regulatory	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000911	melanin	other	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000912	melanin	other	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0000941	desferrioxamin B	other	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0001043	SGR PTMs, SGR PTM Compound b, SGR PTM Compound c, SGR PTM Compound d	NRPS+PKS	NA	AP009493.1
+pos_Sgriseus_NBRC13350	positive	BGC0002673	iminimycin A, iminimycin B	PKS+other	antibacterial,cytotoxic	AP009493.1

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Downloads the positive and negative controls (see controls/README.md). All real, published data:
+# Downloads the positive and negative controls (see controls/README.md; sources and papers in
+# controls/control_panel.tsv). All real, published data:
 #   genomes = the complete reference genome from NCBI (the pipeline uses a .fna as is: no assembly),
 #   reads   = a real R10.4.1 ONT run from ENA (goes through read QC + assembly like an isolate).
 #   bash controls/get_controls.sh OUT_DIR        e.g. ../controls_run/raw_data
@@ -15,7 +16,12 @@ pos_Bvelezensis_FZB42       GCF_000015785.2
 pos_Scoelicolor_A3-2        GCF_000203835.1
 pos_Pprotegens_Pf-5         GCF_000012265.1
 pos_Svenezuelae_ATCC10712   GCA_000253235.1
+pos_Sgriseus_NBRC13350      GCF_000010605.1
+pos_Serythraea_NRRL2338     GCF_000062885.1
+pos_Ecoli_Nissle1917        GCF_000714595.1
 neg_Buchnera_APS            GCF_000009605.1
+neg_Rprowazekii_MadridE     GCF_000195735.1
+neg_Cglutamicum_ATCC13032   GCF_000011325.1
 neg_Ecoli_K12_MG1655_ref    GCF_000005845.2
 "
 # isolate name              ENA run           (E. coli K-12 MG1655 wild type, Kit14/R10.4.1, Dorado sup v5)
