@@ -61,6 +61,16 @@ bash controls_run/setup/bgc_pipeline.sh submit
 python3 controls_run/controls/check_controls.py controls_run/results/_combined/summary
 ```
 
+The checker writes three tables into `controls_run/results/_combined/summary/` and also prints them:
+
+| File | What it shows |
+|---|---|
+| `controls_recovery.tsv` | Per positive: how many expected MIBiG BGCs each tool found, and which were missed by all |
+| `controls_expected_bgcs.tsv` | Every expected MIBiG BGC, and which tools found it |
+| `controls_loci.tsv` | Every control: loci, novelty labels, best score, and `PASS`/`CHECK`/`NOT_IN_RUN` |
+
+If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results/slurm_logs/combined_*.out`.
+
 ## What counts as a pass
 
 | Check | Expected |
