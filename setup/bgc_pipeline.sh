@@ -74,7 +74,7 @@
 # ============================== SETTINGS =====================================
 # Change these to fit your data and server. Everything below SETTINGS can stay.
 #
-# FLOWCHART TAGS: every box in the flowchart (flowchart_*.png / Canva) has a tag, and every
+# FLOWCHART TAGS: every box in the flowchart (flowchart.png, made in Canva) has a tag, and every
 # setting AND code line of that program carries the same tag at the end of the line:
 #   [S01] NanoPlot   [S02] Filtlong   [S03] Flye / genome input   [S05] QUAST   [S06] CheckM2
 #   [S07] Bakta      [S08] antiSMASH  [S09] GECCO   [S10] RGI/CARD   [S13] DeepBGC
