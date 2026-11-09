@@ -46,19 +46,38 @@ The **Tag** matches the box in the flowchart and the `[tag]` at the end of every
 
 ---
 
-## Explore the results on your own computer
+## Explore the results: interactive dashboard
 
-Copy a summary folder from BioCloud to the repository folder on your computer (run this on your computer, not on BioCloud):
+The dashboard reads the results **directly on BioCloud** (no copying) and shows them in your browser:
+
+| Tab | Content |
+|---|---|
+| BGC loci | Every locus: plot of MIBiG similarity vs priority score (hover for details) + filterable table, CSV/Excel export |
+| Per isolate | Loci per isolate by novelty, and which tools found them |
+| QC | CheckM2 completeness vs contamination (95 % / 5 % guides), assembly length vs contigs, read N50 vs quality, assembly depth, and the full QC table with PASS/CHECK |
+| Metadata | Your own sample information (`metadata.tsv`) and the control panel |
+| Controls | Recovery heatmap, verdicts and expected BGCs (after `check-controls`) |
+
+Filters on the left apply to every tab: isolates, a metadata column (also used for colours), novelty, minimum score, number of tools, resistance genes, free-text search. The "Results" list offers every `*/_combined/summary` in the project (your isolates and the controls).
+
+**On BioCloud**, in the terminal of your interactive session (VS Code / RStudio, not the login node):
+
+```bash
+bash setup/bgc_pipeline.sh setup        # once: installs the "dashboard" R environment
+bash setup/bgc_pipeline.sh dashboard
+```
+
+It prints a link like `https://biocloud.bio.aau.dk/rnode/bio-node02/28770/`: open it in your browser. Stop with Ctrl+C.
+
+**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder, first column `isolate` (same names as in `raw_data/`), any other columns. Example: `dashboard/metadata_example.tsv`. The columns are added to every table and can be used to colour and filter.
+
+**On your own computer** (optional): copy a summary folder from BioCloud into the repository folder (run this on your computer),
 
 ```bash
 scp -r ml12pe@student.aau.dk@bio-node02:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results_controls/_combined/summary controls_summary
 ```
 
-(for your own isolates use `results/_combined/summary` instead).
-
-- **Interactive dashboard** (R; once: `install.packages(c("shiny", "DT", "plotly", "bslib", "readr", "dplyr", "tidyr"))`):
-  `Rscript -e 'shiny::runApp("dashboard", launch.browser = TRUE)'`. Type the summary folder on the left and press Load. Tabs: all BGC loci (plot + filterable table, CSV/Excel export), loci per isolate and per tool, genome QC + taxonomy, and the controls.
-- **Report figures of the controls**: `Rscript controls/plot_controls.R controls_summary` (see `controls/README.md`).
+then `Rscript -e 'shiny::runApp("dashboard", launch.browser = TRUE)'` (needs `install.packages(c("shiny", "DT", "plotly", "bslib", "readr", "dplyr", "tidyr"))`). Report figures of the controls: `Rscript controls/plot_controls.R controls_summary`.
 
 ---
 
@@ -289,13 +308,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.4.3 (last updated 2026-11-09) |
+| **Version** | 3.4.4 (last updated 2026-11-09) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.3: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.4: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

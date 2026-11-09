@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.4.3
+#  Version       3.4.4
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.3 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.4 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.4.4  2026-11-09  "dashboard" command: interactive results browser on BioCloud (BGC loci, QC,
+#                       metadata.tsv, controls); its own conda env "dashboard".
 #    3.4.3  2026-11-09  Combined job 8 CPUs / 64 GB (was 32 / 128): GTDB-Tk low-memory mode
 #                       (GTDBTK_LOW_MEMORY -> --scratch_dir, GTDBTK_PPLACER_CPUS=1).
 #    3.4.2  2026-11-09  Flowchart tags [S01]..[C4] on every setting/code line (grep '\[S08\]');
@@ -69,6 +71,7 @@
 #    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
 #    Controls:  bash setup/bgc_pipeline.sh controls [--dry-run]   then, when the jobs are done:
 #               bash setup/bgc_pipeline.sh check-controls          (see controls/README.md)
+#    Dashboard: bash setup/bgc_pipeline.sh dashboard   (interactive results, QC + metadata, in the browser)
 #    Other folders: BGC_RAW_DIR=/abs/raw BGC_RESULTS_DIR=/abs/results bash setup/bgc_pipeline.sh ...
 #    Full instructions: README.md
 # =============================================================================
@@ -197,10 +200,11 @@ declare -A ENV_PACKAGES=(
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
   [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"
+  [dashboard]="r-base>=4.3 r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr"   # only for "dashboard"
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.4.3"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.4.4"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-09"
 
 
@@ -1379,6 +1383,18 @@ case "$CMD" in
     bash "$PROJECT_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
     next=submit; [[ $DRY_RUN -eq 1 ]] && next=run
     BGC_RAW_DIR="$CTRL_RAW" BGC_RESULTS_DIR="$CTRL_RES" exec bash "$SCRIPT_PATH" "$next" "${ARGS[@]}" ;;
+  dashboard)   # interactive results browser (dashboard/app.R), reads results/ and results_controls/ in place
+    find_conda
+    [[ -d "$ENV_DIR/dashboard/conda-meta" ]] || die "Dashboard env missing — run: bash $SCRIPT_PATH setup"
+    port=${DASHBOARD_PORT:-$(( 20000 + RANDOM % 20000 ))}
+    node=$(hostname -s)
+    echo "Dashboard starting on $node, port $port. Open in your browser:"
+    echo "  BioCloud:        https://biocloud.bio.aau.dk/rnode/$node/$port/"
+    echo "  own computer:    http://localhost:$port/"
+    echo "Run it inside an interactive session (not on a login node). Stop with Ctrl+C."
+    # 0.0.0.0: the BioCloud web proxy reaches the app from another machine
+    BGC_PROJECT="$PROJECT_DIR" exec "$CONDA_RUN" run --no-capture-output -p "$ENV_DIR/dashboard" \
+      Rscript -e "shiny::runApp('$PROJECT_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
   check-controls)
     python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" ;;
   help|-h|--help) usage 0 ;;
