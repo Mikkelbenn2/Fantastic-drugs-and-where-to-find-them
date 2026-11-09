@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.4.2
+#  Version       3.4.3
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.2 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.3 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.4.3  2026-11-09  Combined job 8 CPUs / 64 GB (was 32 / 128): GTDB-Tk low-memory mode
+#                       (GTDBTK_LOW_MEMORY -> --scratch_dir, GTDBTK_PPLACER_CPUS=1).
 #    3.4.2  2026-11-09  Flowchart tags [S01]..[C4] on every setting/code line (grep '\[S08\]');
 #                       GECCO_THRESHOLD/_MIN_CDS, BGCPROPHET_MAX_GAP/_MIN_COUNT and MIBIG_EVALUE
 #                       are now settings (same values as before).
@@ -145,6 +147,10 @@ RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100
 RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)  [C2]
 RUN_BIGSCAPE=1                 # BGC families compared with MIBiG  [C3]
 
+GTDBTK_LOW_MEMORY=1            # 1 = GTDB-Tk's pplacer writes to disk (--scratch_dir) instead of RAM: slower,
+                               # far less RAM (normal mode needs ~140 GB for bacteria, GTDB-Tk docs).
+                               # Needs free disk space in results/_combined/gtdbtk/ while it runs.  [C1]
+GTDBTK_PPLACER_CPUS=1          # pplacer RAM grows with its CPUs; 1 = least RAM (GTDB-Tk FAQ)  [C1]
 GTOTREE_HMM="Bacteria"         # marker set; "Actinobacteria" if all isolates are actinomycetes  [C2]
 
 # antiSMASH extra analyses. --cb-knownclusters (MIBiG comparison) is ESSENTIAL for novelty.
@@ -170,7 +176,11 @@ RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4
 SLURM_PARTITION=""             # empty = cluster default
 SLURM_ACCOUNT=""
 SLURM_SAMPLE_CPUS=16;  SLURM_SAMPLE_MEM="64G";   SLURM_SAMPLE_TIME="1-00:00:00"
-SLURM_COMBINED_CPUS=32; SLURM_COMBINED_MEM="128G"; SLURM_COMBINED_TIME="1-00:00:00"
+SLURM_COMBINED_CPUS=8;  SLURM_COMBINED_MEM="64G";  SLURM_COMBINED_TIME="1-00:00:00"
+                               # combined = GTDB-Tk (low-memory mode), GToTree, BiG-SCAPE, summary.
+                               # GTDB-Tk killed for memory ("oom" in results/slurm_logs/combined_*.out)?
+                               # -> raise SLURM_COMBINED_MEM; with GTDBTK_LOW_MEMORY=0 use >= "150G".
+                               # RUN_GTDBTK=0 -> 4 CPUs / "16G" is enough.
 
 # Program versions (minimum). Exact installed versions are logged in results/software_versions.tsv
 declare -A ENV_PACKAGES=(
@@ -190,7 +200,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.4.2"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.4.3"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-09"
 
 
@@ -606,9 +616,12 @@ step_gtdbtk() {
   local out="$COMBINED_DIR/gtdbtk" name g
   [[ $DRY_RUN -eq 0 ]] && mkdir -p "$out/genomes"
   while IFS=$'\t' read -r name g; do run_plain ln -sf "$g" "$out/genomes/$name.fasta"; done < <(finished_genomes)
+  local mem=()
+  [[ $GTDBTK_LOW_MEMORY -eq 1 ]] && { mem=(--scratch_dir "$out/scratch"); run_plain mkdir -p "$out/scratch"; }
   run_in_env gtdbtk bash -c 'export GTDBTK_DATA_PATH="$1"; shift; gtdbtk "$@"' _ "$(gtdbtk_db_path)" \
     classify_wf --genome_dir "$out/genomes" --extension fasta --out_dir "$out" \
-    --cpus "$THREADS"
+    --cpus "$THREADS" --pplacer_cpus "$GTDBTK_PPLACER_CPUS" "${mem[@]}" || return 1
+  run_plain rm -rf "$out/scratch"   # the scratch file is large; not needed after the run
 }
 
 # GToTree — phylogenetic tree from single-copy marker genes, with the closest GTDB reference  [C2]

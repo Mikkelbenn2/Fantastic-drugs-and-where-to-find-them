@@ -195,6 +195,8 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `GECCO_THRESHOLD`, `GECCO_MIN_CDS` | 0.8, 3 | GECCO stricter/looser (its defaults) |
 | `BGCPROPHET_MAX_GAP`, `BGCPROPHET_MIN_COUNT` | 3, 2 | BGC-Prophet cluster joining (README values) |
 | `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
+| `GTDBTK_LOW_MEMORY`, `GTDBTK_PPLACER_CPUS` | 1, 1 | GTDB-Tk low-memory mode (slower, needs free disk). Set `GTDBTK_LOW_MEMORY=0` only with ≥ 150 GB RAM |
+| `SLURM_COMBINED_CPUS`, `SLURM_COMBINED_MEM` | 8, 64G | Resources of the combined job (GTDB-Tk, GToTree, BiG-SCAPE, summary) |
 | `BGCPROPHET_DEVICE` | `cpu` | Your Slurm job has a GPU: use `cuda` |
 | `GTOTREE_HMM` | `Bacteria` | All isolates are actinomycetes: use `Actinobacteria` |
 | `KNOWN_SIMILARITY`, `RELATED_SIMILARITY` | 80, 30 | You want stricter or looser novelty labels |
@@ -226,7 +228,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Disk: databases | ~130 GB (GTDB-Tk alone is ~110 GB) |
 | Disk: results | 2–5 GB per isolate |
 | Time per isolate | ~2–4 hours with 16 CPUs (Flye and antiSMASH take the longest) |
-| Memory | 32–64 GB per isolate; GTDB-Tk needs ~64–100 GB |
+| Memory | 32–64 GB per isolate. Combined job: 8 CPUs / 64 GB, because GTDB-Tk runs in low-memory mode (`GTDBTK_LOW_MEMORY=1`, writes to disk instead of RAM; normal mode needs ~140 GB for bacteria). If it is killed for memory, raise `SLURM_COMBINED_MEM`. With `RUN_GTDBTK=0`, 4 CPUs / 16 GB is enough |
 
 On the AAU BioCloud server, `setup` links every folder in `/databases` into `setup/databases/biocloud/` and uses a shared database whenever it fits the installed program version: GTDB-Tk (release 232) and CheckM2 come from `/databases`. The shared Bakta (2022) and antiSMASH (5.1.0) databases are too old, and CARD is not there, so `setup` downloads those three. At the end, `setup` prints which database each program uses. Elsewhere, run `setup` on a login node with internet access, because compute nodes often have none.
 
@@ -271,13 +273,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.4.2 (last updated 2026-11-09) |
+| **Version** | 3.4.3 (last updated 2026-11-09) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.3: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
