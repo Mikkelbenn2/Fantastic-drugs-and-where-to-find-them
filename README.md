@@ -23,24 +23,26 @@ The overalle work flow of the pipeline is portrayed below
 
 ## What each step does
 
-| # | Program | What it does | Why it matters | Output folder |
+The **Tag** matches the box in the flowchart and the `[tag]` at the end of every setting and code line for that program in `setup/bgc_pipeline.sh`. To find everything for one program, for example antiSMASH: `grep -n '\[S08\]' setup/bgc_pipeline.sh`.
+
+| Tag | Program | What it does | Why it matters | Output folder |
 |---|---|---|---|---|
-| 1 | **NanoPlot** | Read length and quality plots | Catches a bad sequencing run before hours of assembly | `01_nanoplot/` |
-| 2 | **Filtlong** | Removes short and low-quality reads | Cleaner input gives a better assembly | `02_filtlong/` |
-| 3 | **Flye** | De novo genome assembly (no polishing) | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_flye/` (or `03_genome/` when a finished genome was given) |
-| 5 | **QUAST** | Number of contigs, genome length, N50, GC% | Shows how complete the assembly is in one piece | `05_quast/` |
-| 6 | **CheckM2** | Completeness and contamination | Confirms the genome is complete (> 95 %) and the culture is pure (< 5 %) | `06_checkm2/` |
-| 7 | **Bakta** | Finds and names all genes | Every later tool uses the same gene calls (Bakta replaces Prokka, which is no longer maintained) | `07_bakta/` |
-| 8 | **antiSMASH** | Rule-based BGC detection, compared with MIBiG | Finds NRPS, PKS, RiPP, terpene and other clusters, and reports the % similarity to known BGCs | `08_antismash/` |
-| 9 | **GECCO** | Machine-learning BGC detection | Independent second opinion; can find clusters that antiSMASH's rules miss | `09_gecco/` |
-| 10 | **RGI + CARD** | Antibiotic resistance genes | A resistance gene *inside* a BGC suggests self-resistance, so the product is likely an antibiotic | `10_rgi_card/` |
-| 13 | **DeepBGC** | Deep-learning BGC detection + product class and **activity** (antibacterial, antifungal, cytotoxic, inhibitor) | A third opinion, and the only tool here that predicts activity. It calls more, smaller BGCs than antiSMASH | `13_deepbgc/` |
-| 14 | **BGC-Prophet** | Protein-language-model (ESM-2) BGC detection + product class | Fourth opinion that does not depend on Pfam domains, so it can catch unusual clusters | `14_bgc_prophet/` |
-| 15 | **DIAMOND vs MIBiG** | Compares every tool's BGCs with MIBiG, the way antiSMASH's KnownClusterBlast does | Gives GECCO, DeepBGC and BGC-Prophet BGCs a closest known cluster too | `15_mibig/` |
-| 11 | **GTDB-Tk** | Species identification from the genome | Much finer than 16S. "No species match" means a possible new species | `_combined/gtdbtk/` |
-| 12 | **GToTree** | Phylogenetic tree | Places the isolates next to their closest reference genomes | `_combined/gtotree/` |
-| 13 | **BiG-SCAPE** | Groups BGCs into families together with MIBiG | A family *without* any known (MIBiG) member means no characterised relative | `_combined/bigscape/` |
-| – | **Summary** | One table per tool, plus a master table that merges all tools and ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
+| S01 | **NanoPlot** | Read length and quality plots | Catches a bad sequencing run before hours of assembly | `01_nanoplot/` |
+| S02 | **Filtlong** | Removes short and low-quality reads | Cleaner input gives a better assembly | `02_filtlong/` |
+| S03 | **Flye** | De novo genome assembly (no polishing) | Long reads span the repeated modules inside NRPS/PKS genes, so BGCs come out complete | `03_flye/` (or `03_genome/` when a finished genome was given) |
+| S05 | **QUAST** | Number of contigs, genome length, N50, GC% | Shows how complete the assembly is in one piece | `05_quast/` |
+| S06 | **CheckM2** | Completeness and contamination | Confirms the genome is complete (> 95 %) and the culture is pure (< 5 %) | `06_checkm2/` |
+| S07 | **Bakta** | Finds and names all genes | Every later tool uses the same gene calls (Bakta replaces Prokka, which is no longer maintained) | `07_bakta/` |
+| S08 | **antiSMASH** | Rule-based BGC detection, compared with MIBiG | Finds NRPS, PKS, RiPP, terpene and other clusters, and reports the % similarity to known BGCs | `08_antismash/` |
+| S09 | **GECCO** | Machine-learning BGC detection | Independent second opinion; can find clusters that antiSMASH's rules miss | `09_gecco/` |
+| S10 | **RGI + CARD** | Antibiotic resistance genes | A resistance gene *inside* a BGC suggests self-resistance, so the product is likely an antibiotic | `10_rgi_card/` |
+| S13 | **DeepBGC** | Deep-learning BGC detection + product class and **activity** (antibacterial, antifungal, cytotoxic, inhibitor) | A third opinion, and the only tool here that predicts activity. It calls more, smaller BGCs than antiSMASH | `13_deepbgc/` |
+| S14 | **BGC-Prophet** | Protein-language-model (ESM-2) BGC detection + product class | Fourth opinion that does not depend on Pfam domains, so it can catch unusual clusters | `14_bgc_prophet/` |
+| S15 | **DIAMOND vs MIBiG** | Compares every tool's BGCs with MIBiG, the way antiSMASH's KnownClusterBlast does | Gives GECCO, DeepBGC and BGC-Prophet BGCs a closest known cluster too | `15_mibig/` |
+| C1 | **GTDB-Tk** | Species identification from the genome | Much finer than 16S. "No species match" means a possible new species | `_combined/gtdbtk/` |
+| C2 | **GToTree** | Phylogenetic tree | Places the isolates next to their closest reference genomes | `_combined/gtotree/` |
+| C3 | **BiG-SCAPE** | Groups BGCs into families together with MIBiG | A family *without* any known (MIBiG) member means no characterised relative | `_combined/bigscape/` |
+| C4 | **Summary** | One table per tool, plus a master table that merges all tools and ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
 
 ---
 
@@ -190,6 +192,9 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `SHARED_GTDBTK_DB`, `SHARED_BAKTA_DB`, `SHARED_CHECKM2_DB`, `SHARED_ANTISMASH_DB` | AAU server: `/databases/...` | You are on another server: point them at its shared databases, or set `""` to let `setup` download them |
 | `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_DEEPBGC`, `RUN_BGCPROPHET`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
 | `DEEPBGC_SCORE`, `BGCPROPHET_THRESHOLD`, `BGCPROPHET_CLASSIFY_T` | 0.5 | You want the ML tools stricter (higher) or looser (lower) |
+| `GECCO_THRESHOLD`, `GECCO_MIN_CDS` | 0.8, 3 | GECCO stricter/looser (its defaults) |
+| `BGCPROPHET_MAX_GAP`, `BGCPROPHET_MIN_COUNT` | 3, 2 | BGC-Prophet cluster joining (README values) |
+| `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
 | `BGCPROPHET_DEVICE` | `cpu` | Your Slurm job has a GPU: use `cuda` |
 | `GTOTREE_HMM` | `Bacteria` | All isolates are actinomycetes: use `Actinobacteria` |
 | `KNOWN_SIMILARITY`, `RELATED_SIMILARITY` | 80, 30 | You want stricter or looser novelty labels |
@@ -266,13 +271,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.4.1 (last updated 2026-11-08) |
+| **Version** | 3.4.2 (last updated 2026-11-09) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.1: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

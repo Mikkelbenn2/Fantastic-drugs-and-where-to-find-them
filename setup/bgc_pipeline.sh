@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.4.1
+#  Version       3.4.2
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,15 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.1 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.2 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.4.2  2026-11-09  Flowchart tags [S01]..[C4] on every setting/code line (grep '\[S08\]');
+#                       GECCO_THRESHOLD/_MIN_CDS, BGCPROPHET_MAX_GAP/_MIN_COUNT and MIBIG_EVALUE
+#                       are now settings (same values as before).
 #    3.4.1  2026-11-08  "controls" and "check-controls" commands: the controls run with this script
 #                       in raw_data_controls/ -> results_controls/. BGC_RAW_DIR / BGC_RESULTS_DIR
 #                       choose other input/output folders.
@@ -70,6 +73,14 @@
 
 # ============================== SETTINGS =====================================
 # Change these to fit your data and server. Everything below SETTINGS can stay.
+#
+# FLOWCHART TAGS: every box in the flowchart (flowchart_*.png / Canva) has a tag, and every
+# setting AND code line of that program carries the same tag at the end of the line:
+#   [S01] NanoPlot   [S02] Filtlong   [S03] Flye / genome input   [S05] QUAST   [S06] CheckM2
+#   [S07] Bakta      [S08] antiSMASH  [S09] GECCO   [S10] RGI/CARD   [S13] DeepBGC
+#   [S14] BGC-Prophet   [S15] DIAMOND vs MIBiG
+#   [C1] GTDB-Tk   [C2] GToTree   [C3] BiG-SCAPE   [C4] Summary: loci, novelty + ranking
+# Find everything for one box, e.g. antiSMASH:   grep -n '\[S08\]' setup/bgc_pipeline.sh
 
 THREADS=16                     # CPUs per program (inside Slurm: taken from the job)
 
@@ -78,13 +89,13 @@ THREADS=16                     # CPUs per program (inside Slurm: taken from the 
 # Reads. "nano-hq" = R10.4.1 + Dorado hac/sup (Q15-20+). Use "nano-raw" for old R9.4.1 data.
 # Without polishing, R10.4.1 reads should be basecalled with Dorado "sup" (Q20+); older/noisier
 # reads give frameshifts in long NRPS/PKS genes.
-FLYE_READ_MODE="nano-hq"
-GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it
-FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)
-FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases
-FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb genome)
+FLYE_READ_MODE="nano-hq"  # [S03]
+GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it  [S03]
+FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)  [S02]
+FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases  [S02]
+FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb genome)  [S02]
 
-BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)
+BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)  [S07]
 
 # Databases that ALREADY EXIST on the server (shared copies), so "setup" does not have to
 # download them. The script searches inside each folder for the actual database, so pointing
@@ -110,11 +121,11 @@ BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; o
 # (version pairs from the GTDB-Tk docs: ecogenomics.github.io/GTDBTk).
 # Check your version with:  conda run -p setup/envs/gtdbtk gtdbtk --version
 # -------------------------------------------------------------------------------------------
-SHARED_GTDBTK_DB="/databases/GTDB/gtdbtk_packages/GTDB-TK_release232_2026_04_15"
+SHARED_GTDBTK_DB="/databases/GTDB/gtdbtk_packages/GTDB-TK_release232_2026_04_15"  # [C1]
                                # GTDB-Tk 2.7.x needs release 232; an older GTDB-Tk needs an older release
-SHARED_BAKTA_DB="/databases/bakta"
-SHARED_CHECKM2_DB="/databases/checkm2"
-SHARED_ANTISMASH_DB="/databases/AntiSMASH_databases"
+SHARED_BAKTA_DB="/databases/bakta"  # [S07]
+SHARED_CHECKM2_DB="/databases/checkm2"  # [S06]
+SHARED_ANTISMASH_DB="/databases/AntiSMASH_databases"  # [S08]
                                # only used if a version there fits our antiSMASH (8.x); the
                                # AntiSMASH-5.1.0 folder does not, so "setup" downloads its own
 # Not on BioCloud, so "setup" always downloads it: CARD (for RGI). BioCloud has ResFinder and
@@ -126,29 +137,34 @@ SHARED_ANTISMASH_DB="/databases/AntiSMASH_databases"
 SHARED_DB_ROOT="/databases"
 
 # Optional programs (1 = run, 0 = skip)
-RUN_GECCO=1                    # machine-learning BGC detection
-RUN_DEEPBGC=1                  # deep-learning BGC detection + product class/activity prediction
-RUN_BGCPROPHET=1               # protein-language-model BGC detection + product class
-RUN_RGI=1                     # resistance genes (CARD)
-RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100 GB RAM
-RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)
-RUN_BIGSCAPE=1                 # BGC families compared with MIBiG
+RUN_GECCO=1                    # machine-learning BGC detection  [S09]
+RUN_DEEPBGC=1                  # deep-learning BGC detection + product class/activity prediction  [S13]
+RUN_BGCPROPHET=1               # protein-language-model BGC detection + product class  [S14]
+RUN_RGI=1                     # resistance genes (CARD)  [S10]
+RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100 GB RAM  [C1]
+RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)  [C2]
+RUN_BIGSCAPE=1                 # BGC families compared with MIBiG  [C3]
 
-GTOTREE_HMM="Bacteria"         # marker set; "Actinobacteria" if all isolates are actinomycetes
+GTOTREE_HMM="Bacteria"         # marker set; "Actinobacteria" if all isolates are actinomycetes  [C2]
 
 # antiSMASH extra analyses. --cb-knownclusters (MIBiG comparison) is ESSENTIAL for novelty.
-ANTISMASH_EXTRA="--cb-knownclusters --cb-subclusters --cc-mibig --asf --rre --tfbs --pfam2go --clusterhmmer --tigrfam --smcog-trees"
+ANTISMASH_EXTRA="--cb-knownclusters --cb-subclusters --cc-mibig --asf --rre --tfbs --pfam2go --clusterhmmer --tigrfam --smcog-trees"  # [S08]
 
-DEEPBGC_SCORE=0.5              # DeepBGC: minimum BGC score per gene (its default)
-BGCPROPHET_THRESHOLD=0.5       # BGC-Prophet: gene score cut-off (value used in its README)
-BGCPROPHET_CLASSIFY_T=0.5      # BGC-Prophet: class score cut-off (README value)
-BGCPROPHET_DEVICE="cpu"        # "cuda" if the job has a GPU (much faster)
+GECCO_THRESHOLD=0.8            # GECCO: minimum BGC probability per gene (its default)  [S09]
+GECCO_MIN_CDS=3                # GECCO: minimum genes in a cluster (its default)  [S09]
+DEEPBGC_SCORE=0.5              # DeepBGC: minimum BGC score per gene (its default)  [S13]
+BGCPROPHET_THRESHOLD=0.5       # BGC-Prophet: gene score cut-off (value used in its README)  [S14]
+BGCPROPHET_CLASSIFY_T=0.5      # BGC-Prophet: class score cut-off (README value)  [S14]
+BGCPROPHET_MAX_GAP=3           # BGC-Prophet: max non-BGC genes allowed inside one cluster (README value)  [S14]
+BGCPROPHET_MIN_COUNT=2         # BGC-Prophet: min BGC genes per cluster (README value)  [S14]
+BGCPROPHET_DEVICE="cpu"        # "cuda" if the job has a GPU (much faster)  [S14]
 BGCPROPHET_MODEL_URL="https://github.com/HUST-NingKang-Lab/BGC-Prophet/files/12733164/model.tar.gz"
 
-BIGSCAPE_MIBIG_VERSION="4.0"
-BIGSCAPE_CUTOFF="0.30"
-KNOWN_SIMILARITY=80            # KnownClusterBlast % at/above which a BGC counts as "known"
-RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"
+BIGSCAPE_MIBIG_VERSION="4.0"  # [C3]
+BIGSCAPE_CUTOFF="0.30"  # [C3]
+MIBIG_EVALUE="1e-05"           # DIAMOND e-value for proteins vs MIBiG (KnownClusterBlast-like)  [S15]
+KNOWN_SIMILARITY=80            # KnownClusterBlast % at/above which a BGC counts as "known"  [C4]
+RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4]
 
 # Slurm (only used by "submit")
 SLURM_PARTITION=""             # empty = cluster default
@@ -174,8 +190,8 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.4.1"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-11-08"
+PIPELINE_VERSION="3.4.2"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-11-09"
 
 
 set -uo pipefail
@@ -385,7 +401,7 @@ set_sample() {
 }
 is_genome_input() { [[ -f "$SRC" && "$SRC" =~ \.(fasta|fna|fa)(\.gz)?$ ]]; }
 
-# 03 genome — a finished genome was given instead of reads: copy it (unzipped) as the genome.
+# 03 genome — a finished genome was given instead of reads: copy it (unzipped) as the genome.  [S03]
 step_genome() {
   [[ $DRY_RUN -eq 1 ]] && return 0
   if [[ "$SRC" == *.gz ]]; then gzip -dc "$SRC" >"$GENOME"; else cp "$SRC" "$GENOME"; fi
@@ -416,7 +432,7 @@ join_reads() {
   need "$READS"
 }
 
-# 01 NanoPlot — read length + quality. Check: read N50 (>10 kb is good), mean quality
+# 01 NanoPlot — read length + quality. Check: read N50 (>10 kb is good), mean quality  [S01]
 # (matches FLYE_READ_MODE?), total bases / genome size = coverage (aim >= 40x).
 step_nanoplot() {
   join_reads || return 1
@@ -424,10 +440,10 @@ step_nanoplot() {
     --threads "$THREADS" --tsv_stats --loglength
 }
 
-# 02 Filtlong — remove short and low-quality reads so Flye gets cleaner input.
+# 02 Filtlong — remove short and low-quality reads so Flye gets cleaner input.  [S02]
 step_filtlong() {
   [[ $DRY_RUN -eq 1 || -s "$READS" ]] || join_reads || return 1
-  local args=(--min_length "$FILTLONG_MIN_LEN" --keep_percent "$FILTLONG_KEEP_PERCENT")
+  local args=(--min_length "$FILTLONG_MIN_LEN" --keep_percent "$FILTLONG_KEEP_PERCENT")  # [S02]
   [[ -n "$FILTLONG_TARGET_BASES" ]] && args+=(--target_bases "$FILTLONG_TARGET_BASES")
   # Filtlong writes to the screen, so a pipe to gzip is needed -> run it via bash -c
   run_in_env reads bash -c 'set -o pipefail; out=$1; shift; filtlong "$@" | gzip -c > "$out"' \
@@ -437,10 +453,10 @@ step_filtlong() {
     _ "$THREADS" "$READS" "$FILT" "$SD/02_filtlong/read_stats.tsv"
 }
 
-# 03 Flye — de novo assembly. Ideal: one chromosome contig (LINEAR in Streptomyces,
+# 03 Flye — de novo assembly. Ideal: one chromosome contig (LINEAR in Streptomyces,  [S03]
 # that is normal) + plasmids. assembly_info.txt: length, depth and circular Y/N per contig.
 step_flye() {
-  local args=("--$FLYE_READ_MODE" "$FILT" --out-dir "$SD/03_flye" --threads "$THREADS")
+  local args=("--$FLYE_READ_MODE" "$FILT" --out-dir "$SD/03_flye" --threads "$THREADS")  # [S03]
   [[ -n "$GENOME_SIZE" ]] && args+=(--genome-size "$GENOME_SIZE")
   run_in_env flye flye "${args[@]}" || return 1
   need "$DRAFT" || return 1
@@ -448,22 +464,22 @@ step_flye() {
   need "$GENOME"
 }
 
-# 05 QUAST — contiguity: number of contigs, total length, N50, GC% (draft = final: no polishing).
+# 05 QUAST — contiguity: number of contigs, total length, N50, GC% (draft = final: no polishing).  [S05]
 step_quast() {
   run_in_env quast quast.py -o "$SD/05_quast" -t "$THREADS" \
-    --labels "draft,final" "$DRAFT" "$GENOME"
+    --labels "draft,final" "$DRAFT" "$GENOME"  # [S05]
 }
 
-# 06 CheckM2 — completeness (>95 % good) and contamination (<5 % good; high = mixed culture?)
+# 06 CheckM2 — completeness (>95 % good) and contamination (<5 % good; high = mixed culture?)  [S06]
 step_checkm2() {
   local dmnd
   dmnd=$(checkm2_dmnd)
   [[ -n "$dmnd" || $DRY_RUN -eq 1 ]] || { log "    CheckM2 database missing — run: setup"; return 1; }
   run_in_env checkm2 checkm2 predict --threads "$THREADS" --input "$GENOME" \
-    --output-directory "$SD/06_checkm2" --database_path "${dmnd:-CheckM2.dmnd}" --force
+    --output-directory "$SD/06_checkm2" --database_path "${dmnd:-CheckM2.dmnd}" --force  # [S06]
 }
 
-# 07 Bakta — finds and names all genes (successor of Prokka, which is no longer maintained).
+# 07 Bakta — finds and names all genes (successor of Prokka, which is no longer maintained).  [S07]
 # Its GenBank file (.gbff) is the input for antiSMASH, so all tools use the same genes.
 step_bakta() {
   run_in_env bakta bakta --db "$(bakta_db_path)" --output "$SD/07_bakta" \
@@ -472,14 +488,14 @@ step_bakta() {
   need "$GBFF"
 }
 
-# 08 antiSMASH — rule-based BGC detection (NRPS, PKS, RiPP, terpene, ...) and comparison
+# 08 antiSMASH — rule-based BGC detection (NRPS, PKS, RiPP, terpene, ...) and comparison  [S08]
 # with MIBiG (characterised BGCs). Open 08_antismash/index.html in a browser.
 # If antiSMASH does not accept the Bakta file, it retries on the FASTA with Prodigal.
 step_antismash() {
   local out="$SD/08_antismash"
   # shellcheck disable=SC2206
   local extra=($ANTISMASH_EXTRA)
-  local common=(--cpus "$THREADS" --taxon bacteria --databases "$(antismash_db_path)"
+  local common=(--cpus "$THREADS" --taxon bacteria --databases "$(antismash_db_path)"  # [S08]
                 --output-basename "$S" --output-dir "$out" "${extra[@]}")
   if ! run_in_env antismash antismash "${common[@]}" --genefinding-tool none "$GBFF"; then
     warn "antiSMASH could not use the Bakta GenBank for $S — retrying on FASTA + Prodigal"
@@ -489,34 +505,35 @@ step_antismash() {
   need "$out/$S.json"
 }
 
-# 09 GECCO — machine-learning BGC detection (no hand-written rules). Found by both tools =
+# 09 GECCO — machine-learning BGC detection (no hand-written rules). Found by both tools =  [S09]
 # well supported; found only by GECCO = possibly an unusual BGC worth a manual look.
 step_gecco() {
-  run_in_env gecco gecco run --genome "$GENOME" --output-dir "$SD/09_gecco" --jobs "$THREADS"
+  run_in_env gecco gecco run --genome "$GENOME" --output-dir "$SD/09_gecco" --jobs "$THREADS" \
+    --threshold "$GECCO_THRESHOLD" --cds "$GECCO_MIN_CDS"   # [S09]
 }
 
-# 10 RGI/CARD — known resistance genes. A resistance gene INSIDE a BGC is often the
+# 10 RGI/CARD — known resistance genes. A resistance gene INSIDE a BGC is often the  [S10]
 # producer's self-resistance gene -> hints that the product is an antibiotic + its target.
 step_rgi() {
   local out="$SD/10_rgi_card"
   run_plain ln -sfn "$CARD_DB/localDB" "$out/localDB" || return 1     # rgi --local looks in ./localDB
   ( [[ $DRY_RUN -eq 1 ]] || cd "$out" || exit 1
     run_in_env rgi rgi main --input_sequence "$GENOME" --output_file "$out/${S}_rgi" \
-      --input_type contig --alignment_tool DIAMOND -n "$THREADS" --local --clean )
+      --input_type contig --alignment_tool DIAMOND -n "$THREADS" --local --clean )  # [S10]
 }
 
-# 13 DeepBGC — deep-learning (BiLSTM on Pfam domains) BGC detection; also predicts the product
+# 13 DeepBGC — deep-learning (BiLSTM on Pfam domains) BGC detection; also predicts the product  [S13]
 # class and ACTIVITY (antibacterial, antifungal, cytotoxic, inhibitor) of each BGC. Finds its own
 # genes (Prodigal) on the genome FASTA. Known to call more (and more fragmented) BGCs than
 # antiSMASH, so a DeepBGC-only hit is weak evidence on its own.
 step_deepbgc() {
   local out="$SD/13_deepbgc"
   run_in_env deepbgc bash -c 'export DEEPBGC_DOWNLOADS_DIR="$1"; shift; deepbgc "$@"' _ "$DEEPBGC_DB" \
-    pipeline "$GENOME" -o "$out" --score "$DEEPBGC_SCORE" || return 1
+    pipeline "$GENOME" -o "$out" --score "$DEEPBGC_SCORE" || return 1  # [S13]
   need "$out/13_deepbgc.bgc.tsv"      # DeepBGC names its files after the output folder
 }
 
-# 14 BGC-Prophet — transformer on ESM-2 protein embeddings; finds BGC genes and the product class.
+# 14 BGC-Prophet — transformer on ESM-2 protein embeddings; finds BGC genes and the product class.  [S14]
 # It reads proteins, so it gets Bakta's proteins (same genes as antiSMASH). Writes <isolate>_classified.csv.
 step_bgcprophet() {
   local out="$SD/14_bgc_prophet" m
@@ -527,12 +544,13 @@ step_bgcprophet() {
   run_in_env bgcprophet bash -c 'export TORCH_HOME="$1"; cd "$2" && shift 2 && bgc_prophet "$@"' _ \
     "$BGCPROPHET_DB/torch" "$out" pipeline --genomesDir "$out/input" --outputPath "$out" --name "$S" \
     --modelPath "${m:-models}/annotator.pt" --classifierPath "${m:-models}/classifier.pt" \
-    --threshold "$BGCPROPHET_THRESHOLD" --max_gap 3 --min_count 2 --classify_t "$BGCPROPHET_CLASSIFY_T" \
+    --threshold "$BGCPROPHET_THRESHOLD" --max_gap "$BGCPROPHET_MAX_GAP" --min_count "$BGCPROPHET_MIN_COUNT" \
+    --classify_t "$BGCPROPHET_CLASSIFY_T" \
     --device "$BGCPROPHET_DEVICE" --threads "$THREADS" || return 1
   need "$out/${S}_classified.csv"
 }
 
-# 15 MIBiG comparison for EVERY tool: all Bakta proteins vs. the MIBiG proteins of antiSMASH's
+# 15 MIBiG comparison for EVERY tool: all Bakta proteins vs. the MIBiG proteins of antiSMASH's  [S15]
 # KnownClusterBlast (DIAMOND, as antiSMASH does). The summary then scores each predicted BGC
 # like KnownClusterBlast (% of a MIBiG cluster's genes hit at > 45 % identity, > 40 % coverage).
 step_mibig() {
@@ -541,7 +559,7 @@ step_mibig() {
   [[ -n "$d" || $DRY_RUN -eq 1 ]] || { log "    no knownclusterblast/*/proteins.dmnd in $(antismash_db_path)"; return 1; }
   run_in_env antismash diamond blastp --query "$SD/07_bakta/$S.faa" --db "${d:-kcb}/proteins.dmnd" \
     --out "$SD/15_mibig/${S}_vs_mibig.tsv" --outfmt 6 qseqid sseqid pident length qlen slen evalue bitscore \
-    --evalue 1e-05 --max-target-seqs 10000 --threads "$THREADS"
+    --evalue "$MIBIG_EVALUE" --max-target-seqs 10000 --threads "$THREADS"   # [S15]
 }
 
 process_sample() {
@@ -580,7 +598,7 @@ finished_genomes() {   # prints "name<TAB>genome path" for isolates whose genome
   done
 }
 
-# GTDB-Tk — species from the genome (much finer than 16S, especially in Streptomyces).
+# GTDB-Tk — species from the genome (much finer than 16S, especially in Streptomyces).  [C1]
 # No species match ("s__" empty) = possibly a NEW species. Runs once for all isolates.
 # GTDB-Tk >= 2.7 first compares every genome to all GTDB references with skani (the "ANI
 # screen"); --skip_ani_screen no longer exists there.
@@ -593,7 +611,7 @@ step_gtdbtk() {
     --cpus "$THREADS"
 }
 
-# GToTree — phylogenetic tree from single-copy marker genes, with the closest GTDB reference
+# GToTree — phylogenetic tree from single-copy marker genes, with the closest GTDB reference  [C2]
 # genome of each isolate added for context (downloaded from NCBI; if that is not possible,
 # the tree is made from the isolates only).
 step_gtotree() {
@@ -619,7 +637,7 @@ step_gtotree() {
   run_in_env gtotree GToTree -f "$out/genomes.txt" -H "$GTOTREE_HMM" -j "$THREADS" -o "$out/tree" -F
 }
 
-# BiG-SCAPE — groups all BGCs from all isolates + MIBiG into gene-cluster families.
+# BiG-SCAPE — groups all BGCs from all isolates + MIBiG into gene-cluster families.  [C3]
 # A family WITH a MIBiG member = resembles a known pathway; WITHOUT = no characterised relative.
 step_bigscape() {
   local out="$COMBINED_DIR/bigscape" name g f n=0
@@ -641,7 +659,7 @@ step_bigscape() {
     --include-singletons --label P7 -c "$THREADS"
 }
 
-# Summary — collects everything into ranked tables (Python code: write_summary_py below)
+# Summary — collects everything into ranked tables (Python code: write_summary_py below)  [C4]
 step_summary() {
   local names
   names=$(finished_genomes | cut -f1 | paste -sd, -)
@@ -833,7 +851,7 @@ import argparse, csv, glob, json, os, re, sys
 from collections import defaultdict
 
 NA = "NA"
-ANTIBIOTIC_CLASSES = {"NRPS", "PKS", "RiPP"}
+ANTIBIOTIC_CLASSES = {"NRPS", "PKS", "RiPP"}  # [C4]
 
 
 def read_tsv(path):
@@ -996,7 +1014,7 @@ def bgc_prophet(sd, s, genes):
     return out
 
 
-MIN_IDENT, MIN_COVER = 45, 40   # same cut-offs as antiSMASH KnownClusterBlast (exclusive lower bounds)
+MIN_IDENT, MIN_COVER = 45, 40   # same cut-offs as antiSMASH KnownClusterBlast (exclusive lower bounds)  [S15]
 
 
 def mibig_refs(d):
@@ -1045,7 +1063,7 @@ def best_mibig(contig, start, end, genes, hits, refs):
     return best
 
 
-def merge_loci(bgcs):
+def merge_loci(bgcs):  # [C4]
     """group predictions of all tools that overlap on the same contig into one locus"""
     loci = []
     for b in sorted(bgcs, key=lambda x: (x["contig"], x["start"])):
@@ -1059,7 +1077,7 @@ def merge_loci(bgcs):
 TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
 QC_TAX = ["genome_length", "contigs", "N50", "GC_percent", "mean_depth", "circular_contigs", "completeness",
           "contamination", "gtdb_classification", "closest_reference", "closest_ANI", "possible_new_species"]
-ANTIBIOTIC_WORDS = {"NRPS", "PKS", "NRP", "Polyketide", "RiPP"}   # antiSMASH classes + DeepBGC/GECCO/BGC-Prophet classes
+ANTIBIOTIC_WORDS = {"NRPS", "PKS", "NRP", "Polyketide", "RiPP"}   # antiSMASH classes + DeepBGC/GECCO/BGC-Prophet classes  [C4]
 
 
 def fnum(x):
@@ -1117,7 +1135,7 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related):
                     ("antismash_class", "gecco_type", "deepbgc_class", "bgc_prophet_class"))))
         activity = max([fnum(c.get(k)) or 0 for c in m for k in ("deepbgc_antibacterial", "deepbgc_antifungal")], default=0)
         edge = any(c.get("contig_edge") == "yes" for c in m)
-        # ranking: novelty (3/1/0) + antibiotic-type class (2) + each extra tool that agrees (1)
+        # ranking: novelty (3/1/0) + antibiotic-type class (2) + each extra tool that agrees (1)  [C4]
         #          + resistance gene inside (2) + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
         score = {"novel_candidate": 3, "related": 1, "known": 0}[novelty] + (2 if words & ANTIBIOTIC_WORDS else 0) \
             + (len(tools) - 1) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
