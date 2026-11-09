@@ -67,6 +67,22 @@ The checker writes three tables into `results_controls/_combined/summary/` and a
 | `controls_expected_bgcs.tsv` | Every expected MIBiG BGC, and which tools found it |
 | `controls_loci.tsv` | Every control: loci, novelty labels, best score, and `PASS`/`CHECK`/`NOT_IN_RUN` |
 
+**Figures for the report** (R with ggplot2, dplyr, tidyr, readr, forcats, patchwork), after `check-controls`:
+
+```bash
+Rscript controls/plot_controls.R results_controls/_combined/summary
+```
+
+PDF + PNG in `results_controls/_combined/summary/figures/`:
+
+| File | Content |
+|---|---|
+| `fig_controls_overview` | A: known BGCs recovered per positive control and tool; B: BGC loci per control by novelty, with the verdict; C: priority score of every locus (dashed line = 5) |
+| `fig_recovery` | Panel A alone, for the main text |
+| `fig_expected_bgcs` | Every expected MIBiG BGC and which tool found it (supplementary) |
+
+In RStudio: open `controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
+
 If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results_controls/slurm_logs/combined_*.out`.
 
 ## What counts as a pass

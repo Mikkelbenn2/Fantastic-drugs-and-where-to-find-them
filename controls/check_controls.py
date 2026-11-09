@@ -47,7 +47,9 @@ for t in TOOLS:
     for r in rows(os.path.join(summ, "per_tool", f"{t}_bgcs.tsv")):
         found[t][r["isolate"]].add(r.get("MIBiG_accession", ""))
 master = rows(master_file)
-in_run = {r["isolate"] for r in master} | {i for t in TOOLS for i in found[t]}
+# genome_summary.tsv lists every isolate the pipeline finished, also those with no BGC at all
+in_run = {r["isolate"] for r in rows(os.path.join(summ, "genome_summary.tsv"))} \
+    | {r["isolate"] for r in master} | {i for t in TOOLS for i in found[t]}
 
 recovery, per_bgc = [], []
 for iso in sorted(expected):
