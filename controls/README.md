@@ -81,7 +81,7 @@ PDF + PNG in `results_controls/_combined/summary/figures/`:
 | `fig_recovery` | Panel A alone, for the main text |
 | `fig_expected_bgcs` | Every expected MIBiG BGC and which tool found it (supplementary) |
 
-In RStudio: open `controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
+On your own computer: copy the summary folder first (see "Explore the results on your own computer" in the main README), then `Rscript controls/plot_controls.R controls_summary`. In RStudio: open `controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
 
 If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results_controls/slurm_logs/combined_*.out`.
 

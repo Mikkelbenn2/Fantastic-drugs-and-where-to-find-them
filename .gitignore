@@ -7,6 +7,10 @@ results/*
 setup/envs/
 setup/databases/
 setup/*.log
+raw_data_controls/
+results_controls/
+controls_summary/
+junk_yard/
 
 # OS clutter
 .DS_Store

@@ -46,6 +46,22 @@ The **Tag** matches the box in the flowchart and the `[tag]` at the end of every
 
 ---
 
+## Explore the results on your own computer
+
+Copy a summary folder from BioCloud to the repository folder on your computer (run this on your computer, not on BioCloud):
+
+```bash
+scp -r ml12pe@student.aau.dk@bio-node02:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results_controls/_combined/summary controls_summary
+```
+
+(for your own isolates use `results/_combined/summary` instead).
+
+- **Interactive dashboard** (R; once: `install.packages(c("shiny", "DT", "plotly", "bslib", "readr", "dplyr", "tidyr"))`):
+  `Rscript -e 'shiny::runApp("dashboard", launch.browser = TRUE)'`. Type the summary folder on the left and press Load. Tabs: all BGC loci (plot + filterable table, CSV/Excel export), loci per isolate and per tool, genome QC + taxonomy, and the controls.
+- **Report figures of the controls**: `Rscript controls/plot_controls.R controls_summary` (see `controls/README.md`).
+
+---
+
 ## Quick start
 
 ```bash
