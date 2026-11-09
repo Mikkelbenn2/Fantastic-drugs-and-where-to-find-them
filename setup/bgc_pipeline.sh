@@ -200,7 +200,7 @@ declare -A ENV_PACKAGES=(
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
   [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"
-  [dashboard]="r-base>=4.3 r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr"   # only for "dashboard"
+  [dashboard]="r-base>=4.3 libiconv r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr"   # only for "dashboard"
 )
 # =========================== END OF SETTINGS =================================
 
