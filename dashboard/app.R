@@ -84,8 +84,11 @@ server <- function(input, output, session) {
 
   data <- eventReactive(list(input$load, input$dir), {
     d <- if (nzchar(trimws(input$dir_other))) trimws(path.expand(input$dir_other)) else input$dir
+    if (length(d) == 1 && !startsWith(d, "/")) d <- file.path(project, d)   # typed paths are relative to the project
+    if (length(d) == 1 && file.exists(file.path(d, "_combined/summary/master_summary.tsv"))) d <- file.path(d, "_combined/summary")
     validate(need(length(d) == 1 && file.exists(file.path(d, "master_summary.tsv")),
-                  paste0("No results found. Expected <folder>/_combined/summary/master_summary.tsv under ", project)))
+                  paste0("No master_summary.tsv in ", d, ". The run is not finished, or its last (combined) job failed: ",
+                         "check squeue --me and <results folder>/slurm_logs/combined_*.out")))
     meta <- read_metadata()
     genomes <- read_tab(file.path(d, "genome_summary.tsv"))
     if (!is.null(genomes)) genomes <- genomes |> mutate(across(any_of(qc_num), num)) |>
