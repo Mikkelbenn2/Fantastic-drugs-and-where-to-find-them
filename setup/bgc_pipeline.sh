@@ -710,8 +710,11 @@ do_setup() {
   for env in "${!ENV_PACKAGES[@]}"; do
     if [[ -d "$ENV_DIR/$env/conda-meta" ]]; then log "  $env: already installed"; continue; fi
     log "  $env: installing ${ENV_PACKAGES[$env]}"
+    local channels=(-c conda-forge -c bioconda)
+    # R from mixed channels (conda-forge + "defaults") breaks with "libiconv.so.2: cannot open shared object"
+    [[ $env == dashboard ]] && channels=(--override-channels -c conda-forge)
     # shellcheck disable=SC2086
-    "$CONDA_CREATE" create -y -p "$ENV_DIR/$env" -c conda-forge -c bioconda ${ENV_PACKAGES[$env]} \
+    "$CONDA_CREATE" create -y -p "$ENV_DIR/$env" "${channels[@]}" ${ENV_PACKAGES[$env]} \
       >>"$MAIN_LOG" 2>&1 || { warn "  $env: install FAILED (see $MAIN_LOG)"; fail=1; }
   done
 
