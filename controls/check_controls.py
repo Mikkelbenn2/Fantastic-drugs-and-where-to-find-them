@@ -5,7 +5,8 @@ Writes three tables to OUT_DIR (default: the summary folder) and prints them:
    controls_recovery.tsv       positives: per tool, how many of the strain's MIBiG BGCs were found
    controls_expected_bgcs.tsv  every expected MIBiG BGC and which tools found it
    controls_loci.tsv           every control: loci called, novelty labels, best score, PASS/CHECK
-A BGC counts as found when a BGC of that tool has it as MIBiG_accession (top MIBiG hit)."""
+A known BGC counts as found when it is among a predicted BGC's MIBiG matches (MIBiG_all_hits) with
+>= MIN_SIM % similarity, not only the top hit: neighbouring clusters merged into one region count too."""
 import csv, os, re, sys
 from collections import defaultdict
 
@@ -13,6 +14,7 @@ summ = sys.argv[1]
 out_dir = sys.argv[2] if len(sys.argv) > 2 else summ
 here = os.path.dirname(os.path.abspath(__file__))
 TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
+MIN_SIM = 30   # % of the MIBiG cluster's genes hit (= the pipeline's "related" threshold)
 
 
 def acc(x):
@@ -52,6 +54,10 @@ found = {t: defaultdict(set) for t in TOOLS}
 for t in TOOLS:
     for r in rows(os.path.join(summ, "per_tool", f"{t}_bgcs.tsv")):
         found[t][r["isolate"]].add(acc(r.get("MIBiG_accession")))
+        for h in (r.get("MIBiG_all_hits") or "").split(";"):     # older results have no such column
+            a, _, sim = h.rpartition(":")
+            if a and sim.replace(".", "", 1).isdigit() and float(sim) >= MIN_SIM:
+                found[t][r["isolate"]].add(acc(a))
 master = rows(master_file)
 # genome_summary.tsv lists every isolate the pipeline finished, also those with no BGC at all
 in_run = {r["isolate"] for r in rows(os.path.join(summ, "genome_summary.tsv"))} \
@@ -88,7 +94,7 @@ for iso in sorted(set(panel) | {r["isolate"] for r in master}):
         verdict = "PASS" if count("known") + count("related") > 0 else "CHECK"
     else:
         verdict = "-"
-    loci.append([iso, role, len(m), count("known"), count("related"), count("novel_candidate"), count("low_support"),
+    loci.append([iso, role, len(m), count("known"), count("related"), count("novel_candidate"), count("novel_other"), count("low_support"),
                  strong, best, verdict])
-write("controls_loci.tsv", ["isolate", "control", "loci", "known", "related", "novel_candidate", "low_support",
+write("controls_loci.tsv", ["isolate", "control", "loci", "known", "related", "novel_candidate", "novel_other", "low_support",
                             "novel_candidate_score>=5", "best_score", "verdict"], loci)

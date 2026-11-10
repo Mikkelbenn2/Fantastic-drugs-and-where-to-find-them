@@ -37,7 +37,8 @@ theme_user <- function(base_size = 11) {
           strip.text = element_text(face = "bold"), plot.margin = margin(8, 10, 6, 8))
 }
 theme_set(theme_user())
-novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00", low_support = "#BBBBBB")
+novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00", novel_other = "#CC79A7",
+                 low_support = "#BBBBBB")
 tool_lab <- c(antismash = "antiSMASH", gecco = "GECCO", deepbgc = "DeepBGC", bgc_prophet = "BGC-Prophet")
 
 # Short strain names for the axes (falls back to the isolate name for anything else)
@@ -112,7 +113,8 @@ p_novelty <- ggplot(novelty_counts |> mutate(strain = factor(strain, levels = or
             hjust = -0.2, size = 2.9, colour = "grey30") +
   facet_grid(group ~ ., scales = "free_y", space = "free_y") +
   scale_fill_manual(values = novelty_col, breaks = names(novelty_col),
-                    labels = c("Known (80 %+)", "Related", "Novel candidate", "Low support (1 ML tool)"), name = "Novelty") +
+                    labels = c("Known (80 %+)", "Related", "Novel candidate", "Novel, non-antibiotic type", "Low support (1 ML tool)"),
+                    name = "Novelty") +
   guides(fill = guide_legend(nrow = 2)) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(title = "BGC loci per control", subtitle = "All tools merged; label = verdict",
@@ -131,7 +133,7 @@ p_scores <- ggplot(scores, aes(priority_score, strain, colour = novelty)) +
   geom_jitter(width = 0.15, height = 0.2, size = 1.8, alpha = 0.8) +
   facet_grid(group ~ ., scales = "free_y", space = "free_y") +
   scale_colour_manual(values = novelty_col, drop = FALSE,
-                      labels = c("Known", "Related", "Novel candidate", "Low support"), name = "Novelty") +
+                      labels = c("Known", "Related", "Novel candidate", "Novel other", "Low support"), name = "Novelty") +
   guides(colour = guide_legend(nrow = 2)) +
   labs(title = "Priority scores", subtitle = "Dashed: score 5 (strong candidate)",
        x = "Priority score", y = NULL) +
@@ -163,7 +165,7 @@ save_both <- function(p, name, w, h) {
 }
 overview <- (p_recovery | (p_novelty / p_scores)) +
   plot_layout(widths = c(1, 1.1)) + plot_annotation(tag_levels = "A")
-save_both(overview, "fig_controls_overview", 260, 210)
+save_both(overview & theme(legend.text = element_text(size = 8)), "fig_controls_overview", 270, 240)
 save_both(p_recovery, "fig_recovery", 180, 110)
 save_both(p_per_bgc, "fig_expected_bgcs", 180, 40 + 4.2 * nrow(distinct(expected, mibig_accession)))
 message("Figures written to ", normalizePath(out_dir))

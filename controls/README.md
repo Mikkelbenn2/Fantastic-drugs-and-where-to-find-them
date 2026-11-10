@@ -99,6 +99,8 @@ If it stops with "master_summary.tsv not found", the pipeline's last (combined) 
 | Real reads vs published genome, *E. coli* | Same loci with both. If they differ, the assembly from reads is the cause |
 | QC | CheckM2 completeness ≥ 95 % and contamination ≤ 5 % for the free-living strains. *Buchnera* and *Rickettsia* can score lower because of their reduced genomes, which is expected. QUAST genome length equal to the reference |
 
+**Counting rule.** A known BGC counts as found when it is among a predicted BGC's MIBiG matches with ≥ 30 % similarity (column `MIBiG_all_hits`), not only the best match, so clusters that antiSMASH merges into one region still count. Target: ≥ 90 % with any tool.
+
 **Limits.**
 - **Top hit only:** the checker counts a BGC as found only when it is the *top* MIBiG hit of a predicted BGC. Neighbouring clusters that antiSMASH merges into one region, such as the *Bacillus* lipopeptides, can therefore show as missed. Look those up in `per_tool/antismash_bgcs.tsv` before calling them misses.
 - **Absence of evidence:** a negative means "no antibiotic known". Proving that a strain makes none is not possible.

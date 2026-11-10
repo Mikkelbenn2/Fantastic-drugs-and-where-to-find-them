@@ -47,11 +47,14 @@ assert (top["closest_MIBiG"], top["MIBiG_similarity_pct"]) == ("BGC0000002", "25
 assert top["resistance_gene_in_locus"].startswith("testR") and top["completeness"] == "NA"
 assert (known["tools"], known["novelty"], known["priority_score"]) == ("antismash;gecco", "known", "3"), known
 assert (lone["tools"], lone["novelty"], lone["priority_score"]) == ("deepbgc", "low_support", "1"), lone
+assert (top["antibiotic_type"], known["antibiotic_type"]) == ("yes", "yes")       # ML Polyketide / antiSMASH NRPS
 assert known["MIBiG_from"].startswith("antismash (antiSMASH KnownClusterBlast)"), known
 p = rd("per_tool/bgc_prophet_bgcs.tsv")
 assert len(p) == 1 and (p[0]["start"], p[0]["end"]) == ("10000", "12000"), p                 # duplicate window removed
 g = rd("per_tool/gecco_bgcs.tsv")[0]
 assert (g["MIBiG_accession"], g["MIBiG_similarity_pct"], g["locus_id"]) == ("BGC0000001", "100", known["locus_id"]), g
+assert g["MIBiG_all_hits"] == "BGC0000001:100", g
+assert rd("per_tool/antismash_bgcs.tsv")[0]["MIBiG_all_hits"] == "BGC0000001:100"
 assert rd("per_tool/deepbgc_bgcs.tsv")[0]["start"] == "9900"                                  # 0-based -> 1-based
 assert rd("genome_summary.tsv")[0]["BGC_loci_all_tools"] == "3"
 print("summary self-check: all assertions passed")

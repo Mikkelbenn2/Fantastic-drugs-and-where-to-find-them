@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.5.0
+#  Version       3.6.0
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,17 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.5.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.6.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.6.0  2026-11-10  "submit --force STEP" now reaches the Slurm jobs (it was ignored before).
+#                       Ranking: novel_candidate needs an antibiotic-relevant type (ANTIBIOTIC_TYPES for antiSMASH,
+#                       ML_ANTIBIOTIC_CLASSES for loci found by >= 2 ML tools); other unknown BGCs = "novel_other".
+#                       per_tool tables get MIBiG_all_hits (all MIBiG matches, not only the best).
+#                       BGC-Prophet env pinned to python 3.10 + fair-esm >= 2.0 (it crashed with Python 3.14).
 #    3.5.0  2026-11-10  Ranking: a locus not found by antiSMASH needs >= SUPPORT_MIN_TOOLS tools to be a
 #                       candidate; otherwise novelty "low_support" with no novelty/class points (the
 #                       negative controls showed single ML-tool calls scored as strong novel hits).
@@ -177,8 +182,19 @@ BIGSCAPE_CUTOFF="0.30"  # [C3]
 MIBIG_EVALUE="1e-05"           # DIAMOND e-value for proteins vs MIBiG (KnownClusterBlast-like)  [S15]
 KNOWN_SIMILARITY=80            # KnownClusterBlast % at/above which a BGC counts as "known"  [C4]
 SUPPORT_MIN_TOOLS=2            # a locus NOT found by antiSMASH needs >= this many tools to count as a
-                               # candidate; else novelty = "low_support" (single ML-tool calls were the
-                               # false "novel" hits in the negative controls)  [C4]
+                               # candidate (lets ML tools find non-canonical BGCs when they agree); else
+                               # novelty = "low_support" (single ML-tool calls were the false "novel" hits
+                               # in the negative controls)  [C4]
+# Antibiotic-relevant BGC types. Only these can be "novel_candidate" and get +2; other unknown BGCs
+# (terpenes, siderophores, ectoine, melanin, "...-like" low-confidence rules) become "novel_other".  [C4]
+#   antiSMASH region types (used when antiSMASH found the locus):
+ANTIBIOTIC_TYPES="NRPS T1PKS T2PKS T3PKS transAT-PKS prodigiosin lanthipeptide-class-i lanthipeptide-class-ii
+  lanthipeptide-class-iii lanthipeptide-class-iv lanthipeptide-class-v lassopeptide thiopeptide sactipeptide LAP
+  linaridin lipolanthine ranthipeptide glycocin bottromycin cyanobactin microviridin proteusin thioamitides
+  epipeptide guanidinotides azole-containing-RiPP aminocoumarin aminoglycoside amglyccycl blactam betalactone
+  nucleoside phosphonate phenazine tropodithietic-acid pyrrolidine furan isocyanide NAPAA oligosaccharide CDPS"
+#   GECCO / DeepBGC / BGC-Prophet classes (used for loci found by >= 2 ML tools without antiSMASH):
+ML_ANTIBIOTIC_CLASSES="Polyketide NRP RiPP"
 RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4]
 
 # Slurm (only used by "submit")
@@ -201,7 +217,7 @@ declare -A ENV_PACKAGES=(
   [antismash]="antismash>=8.0"
   [gecco]="gecco>=0.9.10"
   [deepbgc]="deepbgc>=0.1.31 python=3.7"   # needs TensorFlow 1.x, which only exists up to Python 3.7
-  [bgcprophet]="bgc-prophet>=0.1.2"
+  [bgcprophet]="bgc-prophet>=0.1.2 python=3.10 fair-esm>=2.0"   # fair-esm < 2 / Python 3.14: get_batch_converter() TypeError
   [rgi]="rgi>=6.0"
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
@@ -210,7 +226,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.5.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.6.0"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -690,7 +706,8 @@ step_summary() {
   write_summary_py "$CL/summary.py"
   python3 "$CL/summary.py" --results "$RESULTS_DIR" --samples "$names" \
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
-    --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" >>"$STEP_LOG" 2>&1
+    --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
+    --abx-types "$ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" >>"$STEP_LOG" 2>&1
 }
 
 process_combined() {
@@ -850,6 +867,8 @@ write_versions() {
 #  SLURM: one array job (one task per isolate) + one combined job afterwards
 # =============================================================================
 do_submit() {
+  local force=""   # pass --force on to the Slurm jobs
+  [[ ${#FORCE_STEPS[@]} -gt 0 ]] && force="--force $(IFS=,; echo "${FORCE_STEPS[*]}")"
   command -v sbatch >/dev/null || die "sbatch not found — run this on the Slurm login node"
   local n=${#SAMPLES[@]} opts=() jid cid
   mkdir -p "$RESULTS_DIR/slurm_logs"
@@ -858,11 +877,11 @@ do_submit() {
   jid=$(sbatch --parsable "${opts[@]}" --job-name bgc_isolates --array "1-$n" \
         --cpus-per-task "$SLURM_SAMPLE_CPUS" --mem "$SLURM_SAMPLE_MEM" --time "$SLURM_SAMPLE_TIME" \
         --output "$RESULTS_DIR/slurm_logs/isolate_%A_%a.out" \
-        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' run --array-task --no-combined") || die "sbatch failed"
+        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' run --array-task --no-combined $force") || die "sbatch failed"
   cid=$(sbatch --parsable "${opts[@]}" --job-name bgc_combined --dependency "afterany:$jid" \
         --cpus-per-task "$SLURM_COMBINED_CPUS" --mem "$SLURM_COMBINED_MEM" --time "$SLURM_COMBINED_TIME" \
         --output "$RESULTS_DIR/slurm_logs/combined_%j.out" \
-        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' combined") || die "sbatch failed"
+        --wrap "BGC_RAW_DIR='$RAW_DIR' BGC_RESULTS_DIR='$RESULTS_DIR' bash '$SCRIPT_PATH' combined $force") || die "sbatch failed"
   echo "Submitted: isolate array job $jid ($n isolates) and combined job $cid (starts after)."
   echo "Watch with: squeue --me      Logs: $RESULTS_DIR/slurm_logs/"
 }
@@ -955,14 +974,15 @@ def antismash_regions(sd, s):
             for res in rec["modules"]["antismash.modules.clusterblast"]["knowncluster"]["results"]:
                 if res.get("ranking"):
                     ref, score = res["ranking"][0]
+                    allhits = ";".join(f'{r.get("accession", NA)}:{sc.get("similarity", NA)}' for r, sc in res["ranking"])
                     kcb[res["region_number"]] = (ref.get("accession", NA), ref.get("description", NA),
-                                                 score.get("similarity", NA))
+                                                 score.get("similarity", NA), allhits)
         except (KeyError, TypeError, ValueError):
             pass
         for i, a in enumerate(rec.get("areas", []), start=1):
             cats = sorted({p.get("category", "") for p in a.get("protoclusters", {}).values() if p.get("category")})
             region = f"{rid}.region{i:03d}"
-            hit = kcb.get(i, (NA, NA, NA))
+            hit = kcb.get(i, (NA, NA, NA, NA))
             out.append({"isolate": s, "contig": rid, "region": region,
                         "start": int(a["start"]) + 1, "end": int(a["end"]),
                         "length_kb": round((int(a["end"]) - int(a["start"])) / 1000, 1),
@@ -970,7 +990,7 @@ def antismash_regions(sd, s):
                         "bgc_class": "+".join(cats) or NA,
                         "contig_edge": "yes" if edge.get(region) else "no",
                         "closest_MIBiG": hit[0], "closest_MIBiG_compound": hit[1],
-                        "MIBiG_similarity_pct": hit[2]})
+                        "MIBiG_similarity_pct": hit[2], "MIBiG_all_hits": hit[3]})
     return out
 
 
@@ -1072,21 +1092,20 @@ def mibig_hits(sd, s):
     return hits
 
 
-def best_mibig(contig, start, end, genes, hits, refs):
-    """KnownClusterBlast-style best MIBiG match for one BGC: % of the MIBiG cluster's genes hit"""
+def mibig_matches(contig, start, end, genes, hits, refs):
+    """KnownClusterBlast-style MIBiG matches for one BGC (% of each MIBiG cluster's genes hit), best first"""
     per_ref = defaultdict(set)
     for tag, (c, a, b) in genes.items():
         if c == contig and overlap(a, b, start, end):
             for ref, prot in hits.get(tag, ()):
                 per_ref[ref].add(prot)
-    best = None
+    found = []
     for ref, prots in per_ref.items():
         if ref not in refs or not refs[ref][1]:
             continue
         sim = int(100 * len(prots & refs[ref][1]) / len(refs[ref][1]))
-        if best is None or (sim, len(prots)) > (best[2], best[3]):
-            best = (ref.split("|")[0], refs[ref][0], sim, len(prots))
-    return best
+        found.append((ref.split("|")[0], refs[ref][0], sim, len(prots)))
+    return sorted(found, key=lambda x: (-x[2], -x[3]))
 
 
 def merge_loci(bgcs):  # [C4]
@@ -1103,7 +1122,6 @@ def merge_loci(bgcs):  # [C4]
 TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
 QC_TAX = ["genome_length", "contigs", "N50", "GC_percent", "mean_depth", "circular_contigs", "completeness",
           "contamination", "gtdb_classification", "closest_reference", "closest_ANI", "possible_new_species"]
-ANTIBIOTIC_WORDS = {"NRPS", "PKS", "NRP", "Polyketide", "RiPP"}   # antiSMASH classes + DeepBGC/GECCO/BGC-Prophet classes  [C4]
 
 
 def fnum(x):
@@ -1127,17 +1145,21 @@ def tool_calls(s, regions, gec, dbg, pro, genes, hits, refs, mibig_ran):
             else:
                 c.update({k: v for k, v in r.items() if k.startswith(tool + "_")})
             if tool == "antismash" and r["closest_MIBiG"] != NA:      # antiSMASH's own KnownClusterBlast hit
-                mib = (r["closest_MIBiG"], r["closest_MIBiG_compound"], r["MIBiG_similarity_pct"], "antiSMASH KnownClusterBlast")
+                mib = (r["closest_MIBiG"], r["closest_MIBiG_compound"], r["MIBiG_similarity_pct"], "antiSMASH KnownClusterBlast",
+                       r["MIBiG_all_hits"])
             else:
-                b = best_mibig(c["contig"], c["start"], c["end"], genes, hits, refs)
-                mib = (b[0], b[1], b[2], "DIAMOND vs KnownClusterBlast data") if b else \
-                      (NA, NA, NA, "no MIBiG hit" if mibig_ran else "not_run")
-            c.update(zip(("MIBiG_accession", "MIBiG_compound", "MIBiG_similarity_pct", "MIBiG_method"), mib))
+                ms = mibig_matches(c["contig"], c["start"], c["end"], genes, hits, refs)
+                mib = (ms[0][0], ms[0][1], ms[0][2], "DIAMOND vs KnownClusterBlast data",
+                       ";".join(f"{x[0]}:{x[2]}" for x in ms)) if ms else \
+                      (NA, NA, NA, "no MIBiG hit" if mibig_ran else "not_run", NA)
+            # MIBiG_all_hits: every MIBiG cluster this BGC matches ("accession:similarity%"), best first
+            c.update(zip(("MIBiG_accession", "MIBiG_compound", "MIBiG_similarity_pct", "MIBiG_method", "MIBiG_all_hits"), mib))
             calls.append(c)
     return calls
 
 
-def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tools=2):
+def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tools=2,
+                abx_types=frozenset({"NRPS", "T1PKS"}), ml_abx=frozenset({"Polyketide", "NRP", "RiPP"})):
     """merge overlapping predictions of all tools into loci, score and describe each locus"""
     rows = []
     for n, L in enumerate(merge_loci(calls), start=1):
@@ -1160,22 +1182,26 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
         # support: antiSMASH (rule-based) or several tools agree. A locus from one ML tool alone is mostly
         # noise (negative controls), so it gets no novelty or class points  [C4]
         supported = "antismash" in tools or len(tools) >= min_tools
-        if novelty == "novel_candidate" and not supported:
-            novelty = "low_support"
-        words = set(re.split(r"[+;,\s]+", " ".join(vals(k) for k in
-                    ("antismash_class", "gecco_type", "deepbgc_class", "bgc_prophet_class"))))
+        # antibiotic-relevant type: antiSMASH's rule-based type when antiSMASH found it, else the ML classes  [C4]
+        if "antismash" in tools:
+            abx = bool(set(re.split(r"[+;]", vals("antismash_type"))) & abx_types)
+        else:
+            abx = bool(set(re.split(r"[+;,\s-]+", " ".join(vals(k) for k in
+                       ("gecco_type", "deepbgc_class", "bgc_prophet_class")))) & ml_abx)
+        if novelty == "novel_candidate":
+            novelty = "low_support" if not supported else ("novel_candidate" if abx else "novel_other")
         activity = max([fnum(c.get(k)) or 0 for c in m for k in ("deepbgc_antibacterial", "deepbgc_antifungal")], default=0)
         edge = any(c.get("contig_edge") == "yes" for c in m)
-        # ranking: novelty (3/1/0; low_support 0) + antibiotic-type class (2, supported loci only)  [C4]
-        #          + each extra tool that agrees (1) + resistance gene inside (2)
+        # ranking: novelty (3/1/0; novel_other and low_support 0) + antibiotic-relevant type (2, supported  [C4]
+        #          loci only) + each extra tool that agrees (1) + resistance gene inside (2)
         #          + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
-        score = {"novel_candidate": 3, "related": 1, "known": 0, "low_support": 0}[novelty] \
-            + (2 if supported and words & ANTIBIOTIC_WORDS else 0) \
+        score = {"novel_candidate": 3, "related": 1, "known": 0, "novel_other": 0, "low_support": 0}[novelty] \
+            + (2 if supported and abx else 0) \
             + (len(tools) - 1) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
         rows.append({"priority_score": score, "novelty": novelty, "isolate": s, "locus_id": lid,
                      "contig": L["contig"], "start": L["start"], "end": L["end"],
                      "length_kb": round((L["end"] - L["start"] + 1) / 1000, 1),
-                     "n_tools": len(tools), "tools": ";".join(tools),
+                     "n_tools": len(tools), "tools": ";".join(tools), "antibiotic_type": "yes" if abx else "no",
                      "antismash_regions": ";".join(c["bgc_id"] for c in m if c["tool"] == "antismash") or NA,
                      **{k: vals(k) for k in ("antismash_type", "antismash_class", "gecco_type", "deepbgc_class",
                                              "deepbgc_activity", "bgc_prophet_class")},
@@ -1250,6 +1276,8 @@ def main():
     ap.add_argument("--out", required=True); ap.add_argument("--cutoff", default="0.30")
     ap.add_argument("--known", type=float, default=80); ap.add_argument("--related", type=float, default=30)
     ap.add_argument("--min-tools", type=int, default=2)
+    ap.add_argument("--abx-types", default="NRPS T1PKS T2PKS T3PKS transAT-PKS")
+    ap.add_argument("--ml-abx", default="Polyketide NRP RiPP")
     ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
     comb = os.path.join(a.results, "_combined")
@@ -1271,7 +1299,8 @@ def main():
 
         mibig_ran = os.path.isfile(os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv"))
         tc = tool_calls(s, regions, gec, dbg, pro, genes, mibig_hits(sd, s), refs, mibig_ran)
-        loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools)
+        loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools,
+                           set(a.abx_types.split()), set(a.ml_abx.split()))
         g["BGC_loci_all_tools"] = len(loci)
         calls += tc; master += loci
 
