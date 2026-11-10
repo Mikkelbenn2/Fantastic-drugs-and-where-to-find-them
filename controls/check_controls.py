@@ -6,13 +6,18 @@ Writes three tables to OUT_DIR (default: the summary folder) and prints them:
    controls_expected_bgcs.tsv  every expected MIBiG BGC and which tools found it
    controls_loci.tsv           every control: loci called, novelty labels, best score, PASS/CHECK
 A BGC counts as found when a BGC of that tool has it as MIBiG_accession (top MIBiG hit)."""
-import csv, os, sys
+import csv, os, re, sys
 from collections import defaultdict
 
 summ = sys.argv[1]
 out_dir = sys.argv[2] if len(sys.argv) > 2 else summ
 here = os.path.dirname(os.path.abspath(__file__))
 TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
+
+
+def acc(x):
+    """MIBiG accession without version: antiSMASH/MIBiG 4 data may write BGC0000176.5 for BGC0000176"""
+    return re.sub(r"\.\d+$", "", (x or "").strip())
 
 
 def rows(path):
@@ -41,11 +46,12 @@ panel = {r["isolate"]: r for r in rows(os.path.join(here, "control_panel.tsv"))}
 expected = defaultdict(list)
 for r in rows(os.path.join(here, "expected_bgcs.tsv")):
     if r["control"] == "positive":
+        r["mibig_accession"] = acc(r["mibig_accession"])
         expected[r["isolate"]].append(r)
 found = {t: defaultdict(set) for t in TOOLS}
 for t in TOOLS:
     for r in rows(os.path.join(summ, "per_tool", f"{t}_bgcs.tsv")):
-        found[t][r["isolate"]].add(r.get("MIBiG_accession", ""))
+        found[t][r["isolate"]].add(acc(r.get("MIBiG_accession")))
 master = rows(master_file)
 # genome_summary.tsv lists every isolate the pipeline finished, also those with no BGC at all
 in_run = {r["isolate"] for r in rows(os.path.join(summ, "genome_summary.tsv"))} \

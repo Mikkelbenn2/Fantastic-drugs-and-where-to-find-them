@@ -45,6 +45,7 @@ read_metadata <- function() {
 
 ui <- page_sidebar(
   title = "BGC pipeline results",
+  fillable = FALSE,                      # let the page scroll; otherwise stacked tables are squeezed and overlap
   theme = bs_theme(version = 5, primary = "#2271B2"),
   sidebar = sidebar(
     width = 330,
@@ -72,7 +73,8 @@ ui <- page_sidebar(
       DTOutput("genomes")),
     nav_panel("Metadata", uiOutput("meta_note"), DTOutput("metadata")),
     nav_panel("Controls", uiOutput("ctrl_note"), plotlyOutput("recovery", height = "380px"),
-              DTOutput("ctrl_loci"), DTOutput("ctrl_expected"))
+              h5("Verdict per control"), DTOutput("ctrl_loci"),
+              h5("Expected MIBiG BGCs and the tools that found them"), DTOutput("ctrl_expected"))
   )
 )
 
@@ -247,7 +249,7 @@ server <- function(input, output, session) {
   })
   output$ctrl_loci <- renderDT({
     validate(need(!is.null(data()$ctrl_loci), ""))
-    datatable(data()$ctrl_loci, rownames = FALSE, options = list(pageLength = 15, dom = "t")) |>
+    datatable(data()$ctrl_loci, rownames = FALSE, options = list(pageLength = 15, dom = "t", scrollX = TRUE)) |>
       formatStyle("verdict", color = styleEqual(c("PASS", "CHECK", "NOT_IN_RUN"), c("#009E73", "#D55E00", "grey")),
                   fontWeight = "bold")
   })
