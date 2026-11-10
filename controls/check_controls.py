@@ -88,6 +88,7 @@ for iso in sorted(set(panel) | {r["isolate"] for r in master}):
         verdict = "PASS" if count("known") + count("related") > 0 else "CHECK"
     else:
         verdict = "-"
-    loci.append([iso, role, len(m), count("known"), count("related"), count("novel_candidate"), strong, best, verdict])
-write("controls_loci.tsv", ["isolate", "control", "loci", "known", "related", "novel_candidate",
+    loci.append([iso, role, len(m), count("known"), count("related"), count("novel_candidate"), count("low_support"),
+                 strong, best, verdict])
+write("controls_loci.tsv", ["isolate", "control", "loci", "known", "related", "novel_candidate", "low_support",
                             "novel_candidate_score>=5", "best_score", "verdict"], loci)

@@ -16,7 +16,7 @@ find_summaries <- function() {
   setNames(d, sub(paste0("^", project, "/?"), "", d))
 }
 
-novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00")
+novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00", low_support = "#BBBBBB")
 tool_lab <- c(antismash = "antiSMASH", gecco = "GECCO", deepbgc = "DeepBGC", bgc_prophet = "BGC-Prophet")
 num <- function(x) suppressWarnings(as.numeric(x))
 read_tab <- function(p) {
@@ -57,7 +57,7 @@ ui <- page_sidebar(
     selectizeInput("iso", "Isolates", choices = NULL, multiple = TRUE, options = list(placeholder = "all")),
     selectInput("meta_col", "Colour / filter by metadata", choices = c("(none)")),
     selectizeInput("meta_val", NULL, choices = NULL, multiple = TRUE, options = list(placeholder = "all values")),
-    checkboxGroupInput("nov", "Novelty", choices = names(novelty_col), selected = names(novelty_col)),
+    checkboxGroupInput("nov", "Novelty", choices = names(novelty_col), selected = setdiff(names(novelty_col), "low_support")),
     sliderInput("score", "Minimum priority score", min = -1, max = 12, value = -1, step = 1),
     sliderInput("ntools", "Found by at least … tools", min = 1, max = 4, value = 1, step = 1),
     checkboxInput("resist", "Only loci with a resistance gene", FALSE),

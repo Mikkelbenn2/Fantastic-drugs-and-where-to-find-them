@@ -37,7 +37,7 @@ theme_user <- function(base_size = 11) {
           strip.text = element_text(face = "bold"), plot.margin = margin(8, 10, 6, 8))
 }
 theme_set(theme_user())
-novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00")
+novelty_col <- c(known = "#2271B2", related = "#E69F00", novel_candidate = "#D55E00", low_support = "#BBBBBB")
 tool_lab <- c(antismash = "antiSMASH", gecco = "GECCO", deepbgc = "DeepBGC", bgc_prophet = "BGC-Prophet")
 
 # Short strain names for the axes (falls back to the isolate name for anything else)
@@ -112,7 +112,8 @@ p_novelty <- ggplot(novelty_counts |> mutate(strain = factor(strain, levels = or
             hjust = -0.2, size = 2.9, colour = "grey30") +
   facet_grid(group ~ ., scales = "free_y", space = "free_y") +
   scale_fill_manual(values = novelty_col, breaks = names(novelty_col),
-                    labels = c("Known (80 %+)", "Related", "Novel candidate"), name = "Novelty") +
+                    labels = c("Known (80 %+)", "Related", "Novel candidate", "Low support (1 ML tool)"), name = "Novelty") +
+  guides(fill = guide_legend(nrow = 2)) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
   labs(title = "BGC loci per control", subtitle = "All tools merged; label = verdict",
        x = "Number of BGC loci", y = NULL) +
@@ -130,7 +131,8 @@ p_scores <- ggplot(scores, aes(priority_score, strain, colour = novelty)) +
   geom_jitter(width = 0.15, height = 0.2, size = 1.8, alpha = 0.8) +
   facet_grid(group ~ ., scales = "free_y", space = "free_y") +
   scale_colour_manual(values = novelty_col, drop = FALSE,
-                      labels = c("Known", "Related", "Novel candidate"), name = "Novelty") +
+                      labels = c("Known", "Related", "Novel candidate", "Low support"), name = "Novelty") +
+  guides(colour = guide_legend(nrow = 2)) +
   labs(title = "Priority scores", subtitle = "Dashed: score 5 (strong candidate)",
        x = "Priority score", y = NULL) +
   theme(legend.position = "bottom")

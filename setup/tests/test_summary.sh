@@ -24,6 +24,8 @@ EOF
 printf 'sequence_id\tcluster_id\tstart\tend\taverage_p\tmax_p\ttype\nctgA\tctgA_cluster_1\t950\t3900\t0.9\t0.99\tNRP\n' >"$R/09_gecco/iso1.clusters.tsv"
 printf 'sequence_id\tbgc_candidate_id\tnucl_start\tnucl_end\tdeepbgc_score\tproduct_class\tproduct_activity\tantibacterial\tantifungal\tcytotoxic\tinhibitor\n' >"$R/13_deepbgc/13_deepbgc.bgc.tsv"
 printf 'ctgA\tctgA_9899-12100.1\t9899\t12100\t0.7\tPolyketide\tantibacterial\t0.8\t0.1\t0.2\t0.1\n' >>"$R/13_deepbgc/13_deepbgc.bgc.tsv"
+# lone DeepBGC call on ctgB (no other tool, no MIBiG hit): must become low_support, not a candidate
+printf 'ctgB\tctgB_99-1400.1\t99\t1400\t0.6\tPolyketide\tantibacterial\t0.9\t0.1\t0.1\t0.1\n' >>"$R/13_deepbgc/13_deepbgc.bgc.tsv"
 cat >"$R/14_bgc_prophet/iso1_classified.csv" <<'EOF'
 ID,sentence,labels,isBGC,TDsentence,TDlabels,probability
 iso1_0,"['g4', 'g5']",Polyketide,Yes,g1 g2,0 0,0.910
@@ -38,18 +40,19 @@ import csv, os, sys
 d = sys.argv[1]
 rd = lambda p: list(csv.DictReader(open(os.path.join(d, p)), delimiter="\t"))
 m = rd("master_summary.tsv")
-assert len(m) == 2, m
-top, known = m
+assert len(m) == 3, m
+top, known, lone = m
 assert (top["tools"], top["novelty"], top["priority_score"]) == ("deepbgc;bgc_prophet", "novel_candidate", "9"), top
 assert (top["closest_MIBiG"], top["MIBiG_similarity_pct"]) == ("BGC0000002", "25"), top        # 1 of 4 genes
 assert top["resistance_gene_in_locus"].startswith("testR") and top["completeness"] == "NA"
 assert (known["tools"], known["novelty"], known["priority_score"]) == ("antismash;gecco", "known", "3"), known
+assert (lone["tools"], lone["novelty"], lone["priority_score"]) == ("deepbgc", "low_support", "1"), lone
 assert known["MIBiG_from"].startswith("antismash (antiSMASH KnownClusterBlast)"), known
 p = rd("per_tool/bgc_prophet_bgcs.tsv")
 assert len(p) == 1 and (p[0]["start"], p[0]["end"]) == ("10000", "12000"), p                 # duplicate window removed
 g = rd("per_tool/gecco_bgcs.tsv")[0]
 assert (g["MIBiG_accession"], g["MIBiG_similarity_pct"], g["locus_id"]) == ("BGC0000001", "100", known["locus_id"]), g
 assert rd("per_tool/deepbgc_bgcs.tsv")[0]["start"] == "9900"                                  # 0-based -> 1-based
-assert rd("genome_summary.tsv")[0]["BGC_loci_all_tools"] == "2"
+assert rd("genome_summary.tsv")[0]["BGC_loci_all_tools"] == "3"
 print("summary self-check: all assertions passed")
 EOF

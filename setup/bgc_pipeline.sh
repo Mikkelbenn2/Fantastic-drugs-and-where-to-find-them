@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.4.4
+#  Version       3.5.0
 #  Created       2026-10-06
 #  Last updated  2026-11-06
 #  License       MIT (see LICENSE)
@@ -18,12 +18,15 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.4.4 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.5.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.5.0  2026-11-10  Ranking: a locus not found by antiSMASH needs >= SUPPORT_MIN_TOOLS tools to be a
+#                       candidate; otherwise novelty "low_support" with no novelty/class points (the
+#                       negative controls showed single ML-tool calls scored as strong novel hits).
 #    3.4.4  2026-11-09  "dashboard" command: interactive results browser on BioCloud (BGC loci, QC,
 #                       metadata.tsv, controls); its own conda env "dashboard".
 #    3.4.3  2026-11-09  Combined job 8 CPUs / 64 GB (was 32 / 128): GTDB-Tk low-memory mode
@@ -173,6 +176,9 @@ BIGSCAPE_MIBIG_VERSION="4.0"  # [C3]
 BIGSCAPE_CUTOFF="0.30"  # [C3]
 MIBIG_EVALUE="1e-05"           # DIAMOND e-value for proteins vs MIBiG (KnownClusterBlast-like)  [S15]
 KNOWN_SIMILARITY=80            # KnownClusterBlast % at/above which a BGC counts as "known"  [C4]
+SUPPORT_MIN_TOOLS=2            # a locus NOT found by antiSMASH needs >= this many tools to count as a
+                               # candidate; else novelty = "low_support" (single ML-tool calls were the
+                               # false "novel" hits in the negative controls)  [C4]
 RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4]
 
 # Slurm (only used by "submit")
@@ -204,8 +210,8 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.4.4"       # keep in sync with the header at the top
-PIPELINE_UPDATED="2026-11-09"
+PIPELINE_VERSION="3.5.0"       # keep in sync with the header at the top
+PIPELINE_UPDATED="2026-11-10"
 
 
 set -uo pipefail
@@ -684,7 +690,7 @@ step_summary() {
   write_summary_py "$CL/summary.py"
   python3 "$CL/summary.py" --results "$RESULTS_DIR" --samples "$names" \
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
-    --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" >>"$STEP_LOG" 2>&1
+    --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" >>"$STEP_LOG" 2>&1
 }
 
 process_combined() {
@@ -1131,7 +1137,7 @@ def tool_calls(s, regions, gec, dbg, pro, genes, hits, refs, mibig_ran):
     return calls
 
 
-def master_rows(s, g, calls, res, fam, members, bs_ran, known, related):
+def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tools=2):
     """merge overlapping predictions of all tools into loci, score and describe each locus"""
     rows = []
     for n, L in enumerate(merge_loci(calls), start=1):
@@ -1151,13 +1157,20 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related):
         keys = [k for k in keys if k]
         fam_mibig = sorted({x for k in keys for x in members[k] if x.startswith("BGC")})
         novelty = "known" if sim >= known else ("related" if sim >= related or fam_mibig else "novel_candidate")
+        # support: antiSMASH (rule-based) or several tools agree. A locus from one ML tool alone is mostly
+        # noise (negative controls), so it gets no novelty or class points  [C4]
+        supported = "antismash" in tools or len(tools) >= min_tools
+        if novelty == "novel_candidate" and not supported:
+            novelty = "low_support"
         words = set(re.split(r"[+;,\s]+", " ".join(vals(k) for k in
                     ("antismash_class", "gecco_type", "deepbgc_class", "bgc_prophet_class"))))
         activity = max([fnum(c.get(k)) or 0 for c in m for k in ("deepbgc_antibacterial", "deepbgc_antifungal")], default=0)
         edge = any(c.get("contig_edge") == "yes" for c in m)
-        # ranking: novelty (3/1/0) + antibiotic-type class (2) + each extra tool that agrees (1)  [C4]
-        #          + resistance gene inside (2) + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
-        score = {"novel_candidate": 3, "related": 1, "known": 0}[novelty] + (2 if words & ANTIBIOTIC_WORDS else 0) \
+        # ranking: novelty (3/1/0; low_support 0) + antibiotic-type class (2, supported loci only)  [C4]
+        #          + each extra tool that agrees (1) + resistance gene inside (2)
+        #          + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
+        score = {"novel_candidate": 3, "related": 1, "known": 0, "low_support": 0}[novelty] \
+            + (2 if supported and words & ANTIBIOTIC_WORDS else 0) \
             + (len(tools) - 1) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
         rows.append({"priority_score": score, "novelty": novelty, "isolate": s, "locus_id": lid,
                      "contig": L["contig"], "start": L["start"], "end": L["end"],
@@ -1236,6 +1249,7 @@ def main():
     ap.add_argument("--results", required=True); ap.add_argument("--samples", required=True)
     ap.add_argument("--out", required=True); ap.add_argument("--cutoff", default="0.30")
     ap.add_argument("--known", type=float, default=80); ap.add_argument("--related", type=float, default=30)
+    ap.add_argument("--min-tools", type=int, default=2)
     ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
     comb = os.path.join(a.results, "_combined")
@@ -1257,7 +1271,7 @@ def main():
 
         mibig_ran = os.path.isfile(os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv"))
         tc = tool_calls(s, regions, gec, dbg, pro, genes, mibig_hits(sd, s), refs, mibig_ran)
-        loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related)
+        loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools)
         g["BGC_loci_all_tools"] = len(loci)
         calls += tc; master += loci
 

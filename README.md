@@ -195,14 +195,15 @@ One row per BGC as that tool predicted it, with the tool's own scores and the sa
 |---|---|
 | ≥ 80 % | `known`: probably a known compound |
 | 30–79 %, or in a BiG-SCAPE family with a MIBiG BGC | `related`: possibly an analogue |
-| < 30 % or no hit | `novel_candidate` |
+| < 30 % or no hit | `novel_candidate`, but only if antiSMASH found the locus or at least `SUPPORT_MIN_TOOLS` (2) tools agree |
+| < 30 % or no hit, found by one machine-learning tool only | `low_support`: no novelty or class points (in the negative controls these single-tool calls were the false "novel" hits) |
 
 **Priority score** in `master_summary.tsv`:
 
 | Evidence | Points |
 |---|---|
-| `novel_candidate` / `related` | +3 / +1 |
-| NRPS, PKS or RiPP (by any tool) | +2 |
+| `novel_candidate` / `related` / `low_support` | +3 / +1 / 0 |
+| NRPS, PKS or RiPP (by any tool), only for loci found by antiSMASH or ≥ 2 tools | +2 |
 | Each extra tool that found the locus | +1 (max +3) |
 | Resistance gene inside the locus | +2 |
 | DeepBGC antibacterial or antifungal score ≥ 0.5 | +1 |
@@ -230,6 +231,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `GECCO_THRESHOLD`, `GECCO_MIN_CDS` | 0.8, 3 | GECCO stricter/looser (its defaults) |
 | `BGCPROPHET_MAX_GAP`, `BGCPROPHET_MIN_COUNT` | 3, 2 | BGC-Prophet cluster joining (README values) |
 | `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
+| `SUPPORT_MIN_TOOLS` | 2 | Number of tools that must agree before a locus without antiSMASH counts as a candidate (1 = old behaviour) |
 | `GTDBTK_LOW_MEMORY`, `GTDBTK_PPLACER_CPUS` | 1, 1 | GTDB-Tk low-memory mode (slower, needs free disk). Set `GTDBTK_LOW_MEMORY=0` only with ≥ 150 GB RAM |
 | `SLURM_COMBINED_CPUS`, `SLURM_COMBINED_MEM` | 8, 64G | Resources of the combined job (GTDB-Tk, GToTree, BiG-SCAPE, summary) |
 | `BGCPROPHET_DEVICE` | `cpu` | Your Slurm job has a GPU: use `cuda` |
@@ -308,13 +310,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.4.4 (last updated 2026-11-09) |
+| **Version** | 3.5.0 (last updated 2026-11-10) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.4.4: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.5.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
