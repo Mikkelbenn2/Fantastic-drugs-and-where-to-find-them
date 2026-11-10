@@ -34,6 +34,12 @@ iso1_2,,NonBGC,No,g6,0,0.000
 EOF
 printf 'Contig\tStart\tStop\tBest_Hit_ARO\tDrug Class\nctgA_5\t10500\t10800\ttestR\ttetracycline antibiotic\n' >"$R/10_rgi_card/iso1_rgi.txt"
 
+# reads (MinKNOW header), Flye contigs and the Bakta report: for the dashboard's sequencing/assembly pages
+mkdir -p "$R"/{01_nanoplot,03_flye}
+printf '@r1 runid=abc123def456 start_time=2026-09-01T10:00:00Z flow_cell_id=PAW12345 barcode=barcode07 basecall_model_version_id=dna_r10.4.1_e8.2_400bps_sup@v5.0.0\nACGT\n+\n5555\n@r2\nAC\n+\n++\n' | gzip -c >"$R/01_nanoplot/iso1.reads.fastq.gz"
+printf '#seq_name\tlength\tcov.\tcirc.\nctgA\t12\t50\tY\nctgB\t4\t80\tN\n' >"$R/03_flye/assembly_info.txt"
+printf '>ctgA desc\nACGTACGT\nACGT\n>ctgB\nACGT\n' >"$R/03_flye/iso1.fasta"
+printf 'Database: v6.0, full\nCDSs: 6\ntRNAs: 2\n' >"$R/07_bakta/iso1.txt"
 python3 "$T/summary.py" --results "$T/results" --samples iso1 --out "$T/out" --mibig "$K" 2>/dev/null
 python3 - "$T/out" <<'EOF'
 import csv, os, sys
@@ -56,6 +62,25 @@ assert (g["MIBiG_accession"], g["MIBiG_similarity_pct"], g["locus_id"]) == ("BGC
 assert g["MIBiG_all_hits"] == "BGC0000001:100", g
 assert rd("per_tool/antismash_bgcs.tsv")[0]["MIBiG_all_hits"] == "BGC0000001:100"
 assert rd("per_tool/deepbgc_bgcs.tsv")[0]["start"] == "9900"                                  # 0-based -> 1-based
-assert rd("genome_summary.tsv")[0]["BGC_loci_all_tools"] == "3"
+gs = rd("genome_summary.tsv")[0]
+assert gs["BGC_loci_all_tools"] == "3"
+assert (gs["basecall_model"], gs["flow_cell_id"], gs["run_id"], gs["barcode"]) == \
+    ("dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "PAW12345", "abc123def456", "barcode07"), gs
+assert (gs["bakta_db"], gs["CDS"], gs["tRNA"]) == ("v6.0, full", "6", "2"), gs
+r = rd("reads_sample.tsv")
+assert [(x["length"], x["meanQ"]) for x in r] == [("4", "20.0"), ("2", "10.0")], r        # '5' = Q20, '+' = Q10
+c = rd("contigs.tsv")
+assert [(x["contig"], x["length"], x["depth"], x["circular"]) for x in c] == [("ctgA", "12", "50", "yes"), ("ctgB", "4", "80", "no")], c
+assert rd("resistance_genes.tsv")[0]["gene"] == "testR"
 print("summary self-check: all assertions passed")
+EOF
+# the shareable dashboard is built from the same tables and carries them as JSON
+python3 "$HERE/../../dashboard/build_site.py" "$T/out" --project "$T" --out "$T/dash.html" >/dev/null
+python3 - "$T/dash.html" <<'EOF'
+import json, re, sys
+h = open(sys.argv[1]).read()
+d = json.loads(re.search(r'<script id="data" type="application/json">(.*?)</script>', h, re.S).group(1))
+assert len(d["master"]) == 3 and d["genomes"][0]["flow_cell_id"] == "PAW12345" and len(d["reads"]) == 2, d.keys()
+assert "__DATA__" not in h and "__PLOTLY__" not in h
+print("dashboard self-check: passed")
 EOF

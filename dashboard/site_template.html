@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<!-- Template for dashboard/build_site.py: the data token below is replaced by all result tables as JSON -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+__PLOTLY__
+<style>
+:root{--bg:#f6f5f0;--card:#fff;--line:#e3e1d8;--text:#1f2a2a;--muted:#5f6c6b;--acc:#2e5e5a;--acc-soft:#e4ecea;
+  --known:#2271B2;--related:#E69F00;--novel_candidate:#D55E00;--novel_other:#CC79A7;--low_support:#BBBBBB}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+a{color:var(--acc)}
+nav{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:10px 24px}
+nav a{padding:4px 12px;border-radius:999px;text-decoration:none;color:var(--text);font-size:14px}
+nav a.on{background:var(--acc);color:#fff}
+nav .brand{font-weight:600;margin-right:8px}
+nav .sp{flex:1}
+nav label{font-size:13px;color:var(--muted)}
+main{max-width:1240px;margin:0 auto;padding:24px}
+.kicker{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--acc);text-transform:uppercase}
+h1{font-size:28px;margin:4px 0 8px}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 10px}
+p.lead{max-width:900px;color:var(--text)}
+.muted{color:var(--muted)}
+.tiles{display:flex;flex-wrap:wrap;gap:28px;margin:18px 0 22px}
+.tile b{display:block;font-size:28px;font-weight:600;line-height:1.1}
+.tile span{font-size:13px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-bottom:18px}
+.grid.three{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.card.wide{grid-column:1/-1}
+.module{cursor:pointer;transition:border-color .15s}
+.module:hover{border-color:var(--acc)}
+.module h3{font-size:17px;margin:4px 0 8px}
+.fact{background:var(--acc-soft);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:13px}
+.plot{width:100%;height:340px}
+.tbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px;font-size:13px}
+.tbar input[type=search]{padding:5px 8px;border:1px solid var(--line);border-radius:6px;min-width:200px;font:inherit}
+button,select{font:inherit;font-size:13px;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:600;border-bottom:2px solid var(--line);padding:6px 8px;white-space:nowrap;cursor:pointer;user-select:none}
+td{border-bottom:1px solid var(--line);padding:5px 8px;vertical-align:top;white-space:nowrap}
+td .wrap{white-space:normal;display:inline-block;min-width:260px}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--acc-soft)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;color:#fff;white-space:nowrap}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:3px 14px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.chips label{margin-right:10px;white-space:nowrap}
+code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--acc-soft);padding:1px 4px;border-radius:4px}
+footer{max-width:1240px;margin:0 auto;padding:10px 24px 40px;font-size:12px;color:var(--muted)}
+@media (max-width:640px){main,nav{padding-left:16px;padding-right:16px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav id="nav"></nav>
+<main id="main"></main>
+<footer id="foot"></footer>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const NOV = ["known", "related", "novel_candidate", "novel_other", "low_support"];
+const NOVLAB = {known: "known", related: "related", novel_candidate: "novel candidate", novel_other: "novel other", low_support: "low support"};
+const NOVCOL = {known: "#2271B2", related: "#E69F00", novel_candidate: "#D55E00", novel_other: "#CC79A7", low_support: "#BBBBBB"};
+const PALETTE = ["#2e5e5a", "#D55E00", "#2271B2", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#8c6d31", "#7f7f7f", "#b5a33a"];
+const state = {colorBy: "", bgcNov: new Set(["known", "related", "novel_candidate"])};
+
+// ---------- small helpers ----------
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const num = v => (v === null || v === undefined || v === "" || v === "NA") ? null : (isNaN(+v) ? null : +v);
+const fmt = (v, d = 0) => { const n = num(v); return n === null ? "–" : n.toLocaleString("en-US", {maximumFractionDigits: d, minimumFractionDigits: d}); };
+const sc = (v, f) => num(v) === null ? null : num(v) / f;   // scaled, NA stays NA
+const na = v => (v === null || v === undefined || v === "" || v === "NA") ? "–" : v;
+const median = a => { a = a.filter(x => x !== null).sort((x, y) => x - y); return a.length ? (a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2) : null; };
+const sum = a => a.reduce((s, x) => s + (x ?? 0), 0);
+const by = (arr, k) => arr.reduce((m, r) => ((m[r[k]] = m[r[k]] || []).push(r), m), {});
+const pill = n => `<span class="pill" style="background:${NOVCOL[n] || "#888"}">${esc(NOVLAB[n] || n)}</span>`;
+const mibigLink = a => a && a !== "NA" ? `<a href="https://mibig.secondarymetabolites.org/repository/${esc(a.replace(/\.\d+$/, ""))}/" target="_blank">${esc(a)}</a>` : "–";
+const ncbiLink = a => a && a !== "NA" ? `<a href="https://www.ncbi.nlm.nih.gov/datasets/genome/${esc(a)}/" target="_blank">${esc(a)}</a>` : "–";
+const doiLink = d => d ? `<a href="https://doi.org/${esc(d)}" target="_blank">${esc(d)}</a>` : "–";
+const isoLink = s => `<a href="#isolate/${encodeURIComponent(s)}">${esc(s)}</a>`;
+const tiles = list => `<div class="tiles">${list.map(([v, l]) => `<div class="tile"><b>${v}</b><span>${l}</span></div>`).join("")}</div>`;
+const card = (title, body, cls = "") => `<div class="card ${cls}">${title ? `<h2>${title}</h2>` : ""}${body}</div>`;
+const head = (kicker, title, lead) => `<div class="kicker">${kicker}</div><h1>${title}</h1><p class="lead">${lead}</p>`;
+
+const G = D.genomes.slice().sort((a, b) => a.isolate.localeCompare(b.isolate));
+const GI = Object.fromEntries(G.map(g => [g.isolate, g]));
+const ISO = G.map(g => g.isolate);
+const M = D.master;
+const LOCI = by(M, "isolate");
+const META = D.metadata || {};
+const isReads = g => num(g.raw_bases) !== null;
+const gb = b => fmt(num(b) === null ? null : num(b) / 1e9, 2);
+const cover = (g, k = "raw_bases") => (num(g[k]) && num(g.genome_length)) ? num(g[k]) / num(g.genome_length) : null;
+const hq = g => num(g.completeness) >= 95 && num(g.contamination) !== null && num(g.contamination) <= 5;
+const strong = r => r.novelty === "novel_candidate" && num(r.priority_score) >= 5;
+const rank = (g, r) => { const m = (g.gtdb_classification || "").match(new RegExp(r + "__([^;]*)")); return m && m[1] ? m[1] : "–"; };
+const setting = (k, d) => { const s = (D.settings || []).find(x => x.setting === k); return s ? s.value : d; };
+function decodeModel(m) {   // dna_r10.4.1_e8.2_400bps_sup@v5.0.0 -> R10.4.1 · 400 bps · sup v5.0.0
+  const x = (m || "").match(/_r([\d.]+)_e[\d.]+_(\d+)bps_(\w+?)@v([\d.]+)/);
+  return x ? `R${x[1]} · ${x[2]} bps · ${x[3]} v${x[4]}` : na(m);
+}
+// metadata columns usable for colouring: few distinct values
+const metaCols = (() => {
+  const cols = {};
+  for (const r of Object.values(META)) for (const [k, v] of Object.entries(r)) (cols[k] = cols[k] || new Set()).add(v);
+  const n = k => Object.values(META).filter(r => k in r).length;    // not one value per isolate (names, notes)
+  return Object.keys(cols).filter(k => cols[k].size >= 2 && cols[k].size <= 12 && cols[k].size < n(k));
+})();
+const group = iso => state.colorBy ? ((META[iso] || {})[state.colorBy] || "unknown") : "isolates";
+
+// ---------- table: search, sort, CSV download, row links ----------
+function table(el, rows, cols, opt = {}) {
+  el = typeof el === "string" ? document.getElementById(el) : el;
+  let q = "", key = opt.sort || null, dir = opt.desc ? -1 : 1, all = false;
+  const id = "t" + Math.random().toString(36).slice(2, 8);
+  el.innerHTML = `<div class="tbar"><input type="search" placeholder="Search table…" id="${id}q">
+    <span class="muted" id="${id}n"></span><span style="flex:1"></span><button id="${id}c">Download CSV</button></div>
+    <div class="tw"><table><thead><tr>${cols.map((c, i) => `<th data-i="${i}" title="${esc(c.tip || "")}">${esc(c.l)}</th>`).join("")}</tr></thead>
+    <tbody id="${id}b"></tbody></table></div><div id="${id}m"></div>`;
+  const val = (r, c) => c.v ? c.v(r) : r[c.k];
+  function draw() {
+    let rs = rows.filter(r => !q || cols.some(c => String(val(r, c) ?? "").toLowerCase().includes(q)));
+    if (key !== null) {
+      const c = cols[key];
+      rs = rs.slice().sort((a, b) => { const x = val(a, c), y = val(b, c), nx = num(x), ny = num(y);
+        return dir * ((nx !== null && ny !== null) ? nx - ny : String(x ?? "").localeCompare(String(y ?? ""))); });
+    }
+    const show = all ? rs : rs.slice(0, opt.max || 100);
+    document.getElementById(id + "b").innerHTML = show.map(r => `<tr class="${opt.link ? "click" : ""}" data-iso="${esc(r.isolate)}">${cols.map(c => {
+      const v = val(r, c); return `<td class="${c.n ? "n" : ""}">${c.f ? c.f(v, r) : (c.n ? fmt(v, c.d || 0) : esc(na(v)))}</td>`; }).join("")}</tr>`).join("") ||
+      `<tr><td colspan="${cols.length}" class="muted">No rows.</td></tr>`;
+    document.getElementById(id + "n").textContent = `${rs.length} of ${rows.length} rows`;
+    document.getElementById(id + "m").innerHTML = rs.length > show.length ? `<button>Show all ${rs.length} rows</button>` : "";
+    const b = document.querySelector(`#${id}m button`); if (b) b.onclick = () => { all = true; draw(); };
+  }
+  document.getElementById(id + "q").oninput = e => { q = e.target.value.toLowerCase(); draw(); };
+  el.querySelectorAll("th").forEach(th => th.onclick = () => { const i = +th.dataset.i; dir = key === i ? -dir : 1; key = i; draw(); });
+  document.getElementById(id + "c").onclick = () => {
+    const lines = [cols.map(c => c.l)].concat(rows.map(r => cols.map(c => val(r, c) ?? "")));
+    const blob = new Blob([lines.map(l => l.map(x => /[",\n]/.test(String(x)) ? `"${String(x).replace(/"/g, '""')}"` : x).join(",")).join("\n")], {type: "text/csv"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = (opt.name || "table") + ".csv"; a.click();
+  };
+  if (opt.link) el.querySelector("tbody").onclick = e => { const tr = e.target.closest("tr"); if (tr && !e.target.closest("a")) location.hash = "isolate/" + encodeURIComponent(tr.dataset.iso); };
+  draw();
+}
+
+// ---------- charts ----------
+function plot(id, traces, layout = {}) {
+  if (!window.Plotly) { document.getElementById(id).innerHTML = '<p class="muted">Charts need internet (plotly.js from cdnjs).</p>'; return; }
+  Plotly.newPlot(id, traces, Object.assign({
+    margin: {l: 60, r: 16, t: 30, b: 50}, font: {family: "IBM Plex Sans, sans-serif", size: 12, color: "#1f2a2a"},
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", legend: {orientation: "h", x: 0, y: 1.02, yanchor: "bottom"},
+    xaxis: {gridcolor: "#ecebe4", zeroline: false}, yaxis: {gridcolor: "#ecebe4", zeroline: false}, hoverlabel: {font: {size: 12}}
+  }, layout), {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"]});
+}
+function groupedScatter(id, gs, x, y, xl, yl, extra = {}) {
+  const grp = by(gs.map(g => ({...g, _g: group(g.isolate)})), "_g");
+  plot(id, Object.keys(grp).map((k, i) => ({type: "scatter", mode: "markers", name: k,
+    x: grp[k].map(x), y: grp[k].map(y), text: grp[k].map(g => g.isolate),
+    marker: {size: 10, color: PALETTE[i % PALETTE.length], line: {color: "#fff", width: 1}},
+    hovertemplate: `%{text}<br>${xl}: %{x}<br>${yl}: %{y}<extra></extra>`})),
+    Object.assign({xaxis: {title: xl, gridcolor: "#ecebe4"}, yaxis: {title: yl, gridcolor: "#ecebe4"}, showlegend: !!state.colorBy}, extra));
+}
+function readHists(idL, idQ, isos) {
+  const rd = D.reads.filter(r => isos.includes(r[0]));
+  if (!rd.length) { for (const id of [idL, idQ]) document.getElementById(id).innerHTML = '<p class="muted">No reads for these isolates (published genome as input, or results made before pipeline v3.7.0).</p>'; return; }
+  const per = by(rd.map(r => ({isolate: r[0], l: r[1], q: r[2]})), "isolate"), ks = Object.keys(per);
+  const hist = (vals, lo, hi, w) => { const n = Math.round((hi - lo) / w), c = new Array(n).fill(0);
+    for (const v of vals) c[Math.min(n - 1, Math.max(0, Math.floor((v - lo) / w)))]++;
+    return {x: c.map((_, i) => lo + (i + 0.5) * w), y: c.map(k => 100 * k / vals.length)}; };
+  const lines = (f, lo, hi, w, fx, unit) => ks.map((k, i) => { const h = hist(per[k].map(f), lo, hi, w);
+    return {type: "scatter", mode: "lines", name: k, x: h.x.map(fx), y: h.y, line: {color: PALETTE[i % PALETTE.length], width: 1.8, shape: "spline"},
+      fill: ks.length === 1 ? "tozeroy" : "none", hovertemplate: `${unit}: %{x}<br>%{y:.1f} % of reads<extra>${esc(k)}</extra>`}; });
+  const leg = ks.length > 1 && ks.length <= 12;
+  plot(idL, lines(r => Math.log10(Math.max(r.l, 1)), 2, 5.5, 0.05, x => Math.round(10 ** x), "length"),
+    {xaxis: {title: "read length (bases, log scale)", type: "log", gridcolor: "#ecebe4"}, yaxis: {title: "% of reads", gridcolor: "#ecebe4"}, showlegend: leg});
+  plot(idQ, lines(r => r.q, 0, 40, 0.5, x => x, "Q"),
+    {xaxis: {title: "mean read quality (Q)", gridcolor: "#ecebe4"}, yaxis: {title: "% of reads", gridcolor: "#ecebe4"},
+     shapes: [{type: "line", x0: 10, x1: 10, yref: "paper", y0: 0, y1: 1, line: {dash: "dot", color: "#999"}}], showlegend: leg});
+}
+
+// ---------- pages ----------
+const PAGES = [
+  ["overview", "Overview"], ["sequencing", "1. Sequencing"], ["assembly", "2. Assembly & quality"], ["taxonomy", "3. Taxonomy"],
+  ["bgcs", "4. BGCs"], ["isolate", "5. Isolates"], ["controls", "Controls"], ["metadata", "Metadata"], ["methods", "Methods"]
+].filter(p => p[0] !== "controls" || D.controls.recovery.length || D.controls.loci.length);
+
+const P = {};
+P.overview = () => {
+  const reads = G.filter(isReads), loci = M.length;
+  const mod = (hash, n, title, text, facts) => `<div class="card module" onclick="location.hash='${hash}'"><div class="kicker">${n}</div><h3>${title}</h3>
+    <div class="muted">${text}</div>${facts.map(f => `<div class="fact">${f}</div>`).join("")}</div>`;
+  const nNovel = M.filter(r => r.novelty === "novel_candidate").length;
+  return head("Results dashboard", esc(D.title),
+    `Every isolate was sequenced with Oxford Nanopore (ONT) long reads, assembled into a genome, checked for quality, named with GTDB and
+     screened for biosynthetic gene clusters (BGCs) by four tools. Each page explains one step with the real data of this run. Click an isolate
+     in any table to open its own page.`) +
+  tiles([[G.length, "isolates"], [gb(sum(reads.map(g => num(g.raw_bases)))) + " Gb", "sequenced (raw reads)"],
+         [`${G.filter(hq).length} / ${G.length}`, "genomes ≥95 % complete, ≤5 % contaminated"], [loci, "BGC loci (all tools)"],
+         [M.filter(strong).length, "novel candidates with score ≥ 5"], [G.filter(g => g.possible_new_species === "yes").length, "possible new species"]]) +
+  `<div class="grid three">` +
+  mod("sequencing", "Module 1", "Sequencing: ONT reads and basecalling", "Flow cell, kit and Dorado model of each run; how long and how accurate the reads are, and what filtering kept.",
+      [`${reads.length} isolates from reads, median read N50 ${fmt(sc(median(reads.map(g => num(g.raw_read_N50))), 1000), 1)} kb`,
+       `median mean quality Q${fmt(median(reads.map(g => num(g.raw_meanQ))), 1)}; median coverage ${fmt(median(reads.map(g => cover(g))), 0)}×`]) +
+  mod("assembly", "Module 2", "Assembly & genome quality", "Flye contigs, circular chromosomes and plasmids, and CheckM2 completeness and contamination.",
+      [`median genome ${fmt(sc(median(G.map(g => num(g.genome_length))), 1e6), 2)} Mb in ${fmt(median(G.map(g => num(g.contigs))), 0)} contig(s)`,
+       `${G.filter(hq).length} high-quality genomes (≥95 % / ≤5 %)`]) +
+  mod("taxonomy", "Module 3", "Taxonomy: who are they?", "GTDB-Tk names each genome; no species match (ANI below 95 %) points to a possible new species.",
+      [`${new Set(G.map(g => rank(g, "g")).filter(x => x !== "–")).size} genera`, `${G.filter(g => g.possible_new_species === "yes").length} possible new species`]) +
+  mod("bgcs", "Module 4", "BGCs: known, related or new?", "antiSMASH, GECCO, DeepBGC and BGC-Prophet predictions merged into loci, compared with MIBiG and ranked.",
+      [`${loci} loci: ${M.filter(r => r.novelty === "known").length} known, ${M.filter(r => r.novelty === "related").length} related`,
+       `${nNovel} novel candidates, ${M.filter(strong).length} with score ≥ 5`]) +
+  mod("isolate", "Module 5", "One isolate at a time", "Everything about one isolate: metadata, run, genome map with its BGCs and resistance genes.",
+      [`${ISO.length} isolate pages`, `${D.resistance.length} resistance genes (RGI/CARD)`]) +
+  mod("methods", "Methods", "Software, settings and scoring", "Program versions, every cut-off used in this run and how the priority score is built.",
+      [`${D.versions.length} programs listed`, `pipeline ${esc(D.pipeline_version || "–")}`]) +
+  `</div>` + card("Top BGC candidates", '<div id="top"></div>', "wide");
+};
+P.overview.after = () => table("top", M.filter(r => r.novelty === "novel_candidate").slice(0, 15), bgcCols(true), {link: true, name: "top_candidates", max: 15});
+
+P.sequencing = () => {
+  const r = G.filter(isReads);
+  return head("Module 1", "Sequencing: ONT reads and basecalling",
+    `Nanopore sequencing measures the current through a protein pore while one DNA strand moves through it. The basecaller (Dorado) turns that
+     signal into bases and gives each base a quality score Q: Q10 means 1 error in 10, Q20 means 1 in 100. Model names such as
+     <code>dna_r10.4.1_e8.2_400bps_sup@v5.0.0</code> give the pore (R10.4.1), speed (400 bases/s) and accuracy mode (fast, hac or sup).
+     Read N50 is the length where half of all bases are in longer reads. Filtlong then removes short and low-quality reads before assembly. Run details come from the read headers that MinKNOW/Dorado write.`) +
+  tiles([[gb(sum(r.map(g => num(g.raw_bases)))) + " Gb", "raw bases, all isolates"], [fmt(sum(r.map(g => num(g.raw_reads)))), "raw reads"],
+         [fmt(sc(median(r.map(g => num(g.raw_read_N50))), 1000), 1) + " kb", "median read N50"], ["Q" + fmt(median(r.map(g => num(g.raw_meanQ))), 1), "median mean quality"],
+         [fmt(median(r.map(g => cover(g))), 0) + "×", "median coverage (raw)"], [new Set(r.map(g => g.flow_cell_id).filter(x => x && x !== "NA")).size, "flow cells"]]) +
+  (G.length > r.length ? `<p class="muted">${G.length - r.length} isolate(s) were given as finished genomes (no reads): ${G.filter(g => !isReads(g)).map(g => esc(g.isolate)).join(", ")}.</p>` : "") +
+  `<div class="grid">${card("Bases per isolate, before and after filtering", '<div id="pb" class="plot"></div>')}
+   ${card("Read N50 and mean quality", '<div id="pnq" class="plot"></div>')}
+   ${card("Read length (first 5,000 reads of each isolate)", '<div id="pl" class="plot"></div>')}
+   ${card("Mean read quality (first 5,000 reads; dotted = Q10)", '<div id="pq" class="plot"></div>')}</div>` +
+  card("Runs and reads per isolate", '<div id="tseq"></div>', "wide");
+};
+P.sequencing.after = () => {
+  const r = G.filter(isReads);
+  plot("pb", [{type: "bar", name: "raw", x: r.map(g => g.isolate), y: r.map(g => num(g.raw_bases) / 1e9), marker: {color: "#9fb8b5"}},
+              {type: "bar", name: "after Filtlong", x: r.map(g => g.isolate), y: r.map(g => num(g.filtered_bases) / 1e9), marker: {color: "#2e5e5a"}}],
+       {barmode: "group", yaxis: {title: "Gb", gridcolor: "#ecebe4"}, xaxis: {tickangle: -40, automargin: true}});
+  groupedScatter("pnq", r, g => num(g.raw_read_N50) / 1000, g => num(g.raw_meanQ), "read N50 (kb)", "mean Q");
+  readHists("pl", "pq", r.map(g => g.isolate));
+  table("tseq", G, [
+    {l: "isolate", k: "isolate", f: v => isoLink(v)}, {l: "barcode", k: "barcode"}, {l: "flow cell", k: "flow_cell_id"},
+    {l: "run start", k: "run_start", f: v => esc(na(v).slice(0, 16).replace("T", " "))}, {l: "basecall model", k: "basecall_model", f: v => esc(decodeModel(v)), tip: "pore · speed · accuracy model"},
+    {l: "kit", k: "kit"}, {l: "raw reads", k: "raw_reads", n: 1}, {l: "raw Gb", v: g => sc(g.raw_bases, 1e9), n: 1, d: 2},
+    {l: "read N50 kb", v: g => sc(g.raw_read_N50, 1000), n: 1, d: 1}, {l: "mean Q", k: "raw_meanQ", n: 1, d: 1}, {l: "median Q", k: "raw_median_Q", n: 1, d: 1},
+    {l: "% reads >Q10", k: "raw_pct_reads_Q10", n: 1, d: 1}, {l: "filtered Gb", v: g => sc(g.filtered_bases, 1e9), n: 1, d: 2},
+    {l: "% bases kept", v: g => num(g.filtered_bases) && num(g.raw_bases) ? 100 * num(g.filtered_bases) / num(g.raw_bases) : null, n: 1, d: 0},
+    {l: "coverage", v: g => cover(g), n: 1, f: v => v === null ? "–" : fmt(v) + "×", tip: "raw bases / genome length"},
+    {l: "coverage filtered", v: g => cover(g, "filtered_bases"), n: 1, f: v => v === null ? "–" : fmt(v) + "×"}
+  ], {link: true, name: "sequencing"});
+};
+
+P.assembly = () => head("Module 2", "Assembly & genome quality",
+    `Flye assembles the filtered reads into contigs. A good bacterial assembly is one chromosome contig (circular, or linear in
+     <i>Streptomyces</i>, which is normal) plus plasmids. Depth is the mean read coverage of a contig. CheckM2 estimates how complete the genome is and
+     how much foreign DNA it contains from single-copy marker genes; the pipeline's guide values are ≥95 % completeness and ≤5 % contamination.
+     Bakta annotates the genes.`) +
+  tiles([[G.length, "genomes"], [fmt(sc(median(G.map(g => num(g.genome_length))), 1e6), 2) + " Mb", "median genome size"],
+         [G.filter(g => num(g.contigs) === 1).length, "single-contig genomes"], [sum(G.map(g => num(g.circular_contigs))), "circular contigs"],
+         [G.filter(hq).length, "≥95 % complete, ≤5 % contaminated"], [fmt(median(G.map(g => num(g.GC_percent))), 1) + " %", "median GC"]]) +
+  `<div class="grid">${card("Completeness and contamination (CheckM2)", '<div id="pcc" class="plot"></div>')}
+   ${card("Contigs of each genome (dark = circular)", '<div id="pctg" class="plot"></div>')}</div>` +
+  card("Assembly and annotation per isolate", '<div id="tasm"></div>', "wide");
+P.assembly.after = () => {
+  groupedScatter("pcc", G, g => num(g.completeness), g => num(g.contamination), "completeness (%)", "contamination (%)", {shapes: [
+    {type: "line", x0: 95, x1: 95, yref: "paper", y0: 0, y1: 1, line: {dash: "dot", color: "#999"}},
+    {type: "line", y0: 5, y1: 5, xref: "paper", x0: 0, x1: 1, line: {dash: "dot", color: "#999"}}]});
+  const cs = by(D.contigs, "isolate"), segs = {yes: [], no: [], NA: []};
+  for (const iso of ISO) { let off = 0; for (const c of cs[iso] || []) { (segs[c.circular] || segs.NA).push({iso, c, off}); off += num(c.length); } }
+  const tr = (k, name, col) => ({type: "bar", orientation: "h", name, y: segs[k].map(s => s.iso), x: segs[k].map(s => num(s.c.length) / 1e6),
+    base: segs[k].map(s => s.off / 1e6), marker: {color: col, line: {color: "#fff", width: 1}},
+    text: segs[k].map(s => `${s.c.contig}: ${fmt(num(s.c.length) / 1e3, 1)} kb, depth ${na(s.c.depth)}×`), textposition: "none", hovertemplate: "%{y}<br>%{text}<extra></extra>"});
+  if (!D.contigs.length) document.getElementById("pctg").innerHTML = '<p class="muted">No contig table (results made before pipeline v3.7.0).</p>';
+  else plot("pctg", [tr("yes", "circular", "#2e5e5a"), tr("no", "linear", "#9fb8b5"), tr("NA", "unknown", "#cfcfcf")].filter(t => t.y.length),
+    {barmode: "overlay", xaxis: {title: "Mb", gridcolor: "#ecebe4"}, yaxis: {automargin: true, autorange: "reversed"}, margin: {l: 10, r: 16, t: 10, b: 50},
+     height: Math.max(340, 22 * ISO.length + 90)});
+  table("tasm", G, [
+    {l: "isolate", k: "isolate", f: v => isoLink(v)}, {l: "genome Mb", v: g => sc(g.genome_length, 1e6), n: 1, d: 2}, {l: "contigs", k: "contigs", n: 1},
+    {l: "circular", k: "circular_contigs", n: 1}, {l: "N50 kb", v: g => sc(g.N50, 1e3), n: 1, d: 0}, {l: "GC %", k: "GC_percent", n: 1, d: 1},
+    {l: "depth", k: "mean_depth", n: 1, f: v => num(v) === null ? "–" : fmt(v) + "×"}, {l: "completeness %", k: "completeness", n: 1, d: 1},
+    {l: "contamination %", k: "contamination", n: 1, d: 2}, {l: "quality", v: g => num(g.completeness) === null ? null : (hq(g) ? "high" : "check")},
+    {l: "CDS", k: "CDS", n: 1}, {l: "tRNA", k: "tRNA", n: 1}, {l: "rRNA", k: "rRNA", n: 1}, {l: "coding %", k: "coding_density", n: 1, d: 1}
+  ], {link: true, name: "assembly"});
+};
+
+P.taxonomy = () => head("Module 3", "Taxonomy: who are they?",
+    `GTDB-Tk places each genome in the Genome Taxonomy Database tree and compares it with the closest reference genome by average nucleotide
+     identity (ANI). At ANI ≥ 95 % the genome belongs to that species; with no species match (<code>s__</code> empty) it may be a new species.
+     GToTree builds a phylogeny from bacterial marker genes of the isolates and their closest references.`) +
+  tiles([[G.filter(g => rank(g, "s") !== "–").length, "named to a GTDB species"], [G.filter(g => g.possible_new_species === "yes").length, "possible new species"],
+         [new Set(G.map(g => rank(g, "g")).filter(x => x !== "–")).size, "genera"], [new Set(G.map(g => rank(g, "p")).filter(x => x !== "–")).size, "phyla"]]) +
+  `<div class="grid">${card("Isolates per genus", '<div id="pgen" class="plot"></div>')}
+   ${card("ANI to the closest GTDB reference", '<div id="pani" class="plot"></div>')}</div>` +
+  card("GTDB classification per isolate", '<div id="ttax"></div>', "wide");
+P.taxonomy.after = () => {
+  const gen = by(G.map(g => ({...g, gen: rank(g, "g")})), "gen"), ks = Object.keys(gen).sort((a, b) => gen[a].length - gen[b].length);
+  plot("pgen", [{type: "bar", orientation: "h", y: ks, x: ks.map(k => gen[k].length), marker: {color: "#2e5e5a"}, hovertemplate: "%{y}: %{x}<extra></extra>"}],
+       {yaxis: {automargin: true}, xaxis: {title: "isolates", dtick: 1, gridcolor: "#ecebe4"}, margin: {l: 10, r: 16, t: 10, b: 50}});
+  groupedScatter("pani", G.filter(g => num(g.closest_ANI) !== null), g => g.isolate, g => num(g.closest_ANI), "", "ANI (%)",
+    {xaxis: {tickangle: -40, automargin: true}, shapes: [{type: "line", y0: 95, y1: 95, xref: "paper", x0: 0, x1: 1, line: {dash: "dot", color: "#999"}}]});
+  table("ttax", G, [
+    {l: "isolate", k: "isolate", f: v => isoLink(v)}, {l: "phylum", v: g => rank(g, "p")}, {l: "family", v: g => rank(g, "f")},
+    {l: "genus", v: g => rank(g, "g"), f: v => `<i>${esc(v)}</i>`}, {l: "species", v: g => rank(g, "s"), f: v => `<i>${esc(v)}</i>`},
+    {l: "closest reference", k: "closest_reference", f: v => ncbiLink(v)}, {l: "ANI %", k: "closest_ANI", n: 1, d: 2},
+    {l: "possible new species", k: "possible_new_species"}, {l: "full GTDB string", k: "gtdb_classification", f: v => `<span class="muted wrap">${esc(na(v))}</span>`}
+  ], {link: true, name: "taxonomy"});
+};
+
+function bgcCols(short) {
+  const c = [
+    {l: "rank", k: "rank", n: 1}, {l: "score", k: "priority_score", n: 1}, {l: "novelty", k: "novelty", f: v => pill(v)},
+    {l: "isolate", k: "isolate", f: v => isoLink(v)}, {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1}, {l: "kb", k: "length_kb", n: 1, d: 1},
+    {l: "tools", k: "tools", f: v => esc(na(v).replace(/;/g, ", "))}, {l: "antiSMASH type", k: "antismash_type"},
+    {l: "ML classes", v: r => [r.gecco_type, r.deepbgc_class, r.bgc_prophet_class].filter(x => x && x !== "NA").join(" / ") || "NA"},
+    {l: "closest MIBiG", k: "closest_MIBiG", f: v => mibigLink(v)}, {l: "compound", k: "closest_MIBiG_compound"},
+    {l: "MIBiG sim %", k: "MIBiG_similarity_pct", n: 1, tip: "% of the MIBiG cluster's genes found"},
+    {l: "resistance gene", k: "resistance_gene_in_locus"}, {l: "edge", k: "contig_edge", tip: "cut by a contig edge"},
+    {l: "BiG-SCAPE family", k: "bigscape_family"}];
+  return short ? c.filter(x => !["contig", "start", "edge", "BiG-SCAPE family"].includes(x.l)) : c;
+}
+P.bgcs = () => {
+  const cnt = n => M.filter(r => r.novelty === n).length;
+  return head("Module 4", "BGCs: known, related or new?",
+    `Four tools predict BGCs: antiSMASH (rules), GECCO, DeepBGC and BGC-Prophet (machine learning). Predictions that overlap are merged into one
+     <b>locus</b>. Each locus is compared with MIBiG, the database of characterised BGCs: <b>known</b> ≥ ${esc(setting("known", "80"))} % of a MIBiG
+     cluster's genes found, <b>related</b> ${esc(setting("related", "30"))}–${num(setting("known", "80")) - 1} % or in a BiG-SCAPE family with a MIBiG
+     member. Below that a locus is a <b>novel candidate</b> when it is supported (antiSMASH, or ≥ ${esc(setting("min_tools", "2"))} tools agree) and of an
+     antibiotic-relevant type, <b>novel other</b> when supported but not of such a type, and <b>low support</b> when one ML tool alone found it.
+     The priority score adds evidence (see Methods).`) +
+  tiles([[M.length, "loci"], [cnt("known"), "known"], [cnt("related"), "related"], [cnt("novel_candidate"), "novel candidates"],
+         [M.filter(strong).length, "novel candidates, score ≥ 5"], [cnt("novel_other") + cnt("low_support"), "novel other + low support"]]) +
+  `<div class="grid">${card("Loci per isolate by novelty", '<div id="pnov" class="plot"></div>')}
+   ${card("Priority score of every locus", '<div id="psc" class="plot"></div>')}
+   ${card("Size and MIBiG similarity of every locus", '<div id="psim" class="plot"></div>', "wide")}</div>` +
+  card("All loci", `<div class="tbar chips">Show: ${NOV.map(n => `<label><input type="checkbox" value="${n}" ${state.bgcNov.has(n) ? "checked" : ""}> ${pill(n)}</label>`).join("")}
+    <label>min score <input type="number" id="minsc" value="${state.minScore ?? ""}" style="width:60px"></label></div><div id="tbgc"></div>`, "wide");
+};
+P.bgcs.after = () => {
+  const per = by(M, "isolate"), isos = ISO.filter(i => per[i]);
+  plot("pnov", NOV.map(n => ({type: "bar", name: NOVLAB[n], x: isos, y: isos.map(i => per[i].filter(r => r.novelty === n).length), marker: {color: NOVCOL[n]}})),
+       {barmode: "stack", yaxis: {title: "loci", gridcolor: "#ecebe4"}, xaxis: {tickangle: -40, automargin: true}});
+  plot("psc", NOV.map(n => ({type: "histogram", name: NOVLAB[n], x: M.filter(r => r.novelty === n).map(r => num(r.priority_score)), marker: {color: NOVCOL[n]}, xbins: {size: 1}})),
+       {barmode: "stack", xaxis: {title: "priority score", dtick: 1, gridcolor: "#ecebe4"}, yaxis: {title: "loci", gridcolor: "#ecebe4"},
+        shapes: [{type: "line", x0: 4.5, x1: 4.5, yref: "paper", y0: 0, y1: 1, line: {dash: "dot", color: "#999"}}]});
+  plot("psim", NOV.map(n => { const rs = M.filter(r => r.novelty === n); return {type: "scatter", mode: "markers", name: NOVLAB[n],
+    x: rs.map(r => num(r.length_kb)), y: rs.map(r => num(r.MIBiG_similarity_pct) ?? 0), marker: {color: NOVCOL[n], size: rs.map(r => 5 + 1.5 * (num(r.priority_score) || 0)), opacity: .75},
+    text: rs.map(r => `${r.locus_id}<br>${r.tools}<br>${r.antismash_type !== "NA" ? r.antismash_type : ""} ${r.closest_MIBiG_compound !== "NA" ? "≈ " + r.closest_MIBiG_compound : ""}<br>score ${r.priority_score}`),
+    hovertemplate: "%{text}<br>%{x} kb, %{y} % similar<extra></extra>"}; }),
+    {xaxis: {title: "locus length (kb, log)", type: "log", gridcolor: "#ecebe4"}, yaxis: {title: "MIBiG similarity (%)", gridcolor: "#ecebe4"},
+     shapes: [30, 80].map(y => ({type: "line", y0: y, y1: y, xref: "paper", x0: 0, x1: 1, line: {dash: "dot", color: "#999"}}))});
+  const draw = () => table("tbgc", M.filter(r => state.bgcNov.has(r.novelty) && (state.minScore == null || num(r.priority_score) >= state.minScore)), bgcCols(false), {link: true, name: "bgc_loci"});
+  document.querySelectorAll(".chips input[type=checkbox]").forEach(cb => cb.onchange = () => { cb.checked ? state.bgcNov.add(cb.value) : state.bgcNov.delete(cb.value); draw(); });
+  document.getElementById("minsc").oninput = e => { state.minScore = e.target.value === "" ? null : +e.target.value; draw(); };
+  draw();
+};
+
+P.isolate = arg => {
+  const iso = arg && GI[arg] ? arg : ISO[0];
+  if (!iso) return "<p>No isolates.</p>";
+  const g = GI[iso], L = LOCI[iso] || [], meta = META[iso] || {};
+  const kv = obj => `<dl class="kv">${Object.entries(obj).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${/^–\s?(Gb|%|kb|×)$/.test(v) ? "–" : v}</dd>`).join("")}</dl>`;
+  const metaKv = Object.fromEntries(Object.entries(meta).map(([k, v]) => [k.replace(/_/g, " "), /doi$/.test(k) ? doiLink(v) : esc(v)]));
+  return `<div class="kicker">Module 5 · isolate</div><h1><select id="isosel" style="font-size:20px;font-weight:600">${ISO.map(i => `<option ${i === iso ? "selected" : ""}>${esc(i)}</option>`).join("")}</select></h1>
+    <p class="lead"><i>${esc(rank(g, "s") !== "–" ? rank(g, "s") : (rank(g, "g") !== "–" ? rank(g, "g") + " sp." : "no GTDB classification"))}</i>${g.possible_new_species === "yes" ? " · <b>possible new species</b>" : ""}</p>` +
+  tiles([[fmt(sc(g.genome_length, 1e6), 2) + " Mb", `${fmt(g.contigs)} contigs, ${fmt(g.circular_contigs)} circular`],
+         [fmt(g.completeness, 1) + " %", `complete, ${fmt(g.contamination, 2)} % contaminated`],
+         [isReads(g) ? gb(g.raw_bases) + " Gb" : "genome", isReads(g) ? `reads, N50 ${fmt(sc(g.raw_read_N50, 1000), 1)} kb, Q${fmt(g.raw_meanQ, 1)}` : "published genome, no reads"],
+         [L.length, "BGC loci"], [L.filter(r => r.novelty === "novel_candidate").length, `novel candidates (${L.filter(strong).length} with score ≥ 5)`],
+         [(D.resistance || []).filter(r => r.isolate === iso).length, "resistance genes"]]) +
+  `<div class="grid three">` +
+  card("Sample metadata", Object.keys(metaKv).length ? kv(metaKv) : '<p class="muted">No metadata. Add a row for this isolate to <code>metadata.tsv</code> in the project folder.</p>') +
+  card("Sequencing run", kv({"barcode": esc(na(g.barcode)), "flow cell": esc(na(g.flow_cell_id)), "run id": esc(na(g.run_id)), "run start": esc(na(g.run_start)),
+       "basecall model": esc(na(g.basecall_model)), "kit": esc(na(g.kit)), "raw reads": fmt(g.raw_reads), "raw bases": gb(g.raw_bases) + " Gb",
+       "after Filtlong": gb(g.filtered_bases) + " Gb", "coverage": cover(g) === null ? "–" : fmt(cover(g)) + "×"})) +
+  card("Genome and taxonomy", kv({"GTDB": `<span class="muted">${esc(na(g.gtdb_classification)).replace(/;/g, "; ")}</span>`, "closest reference": ncbiLink(g.closest_reference),
+       "ANI": fmt(g.closest_ANI, 2) + " %", "N50": fmt(sc(g.N50, 1e3), 0) + " kb", "GC": fmt(g.GC_percent, 1) + " %", "depth": fmt(g.mean_depth) + "×",
+       "CDS / tRNA / rRNA": `${fmt(g.CDS)} / ${fmt(g.tRNA)} / ${fmt(g.rRNA)}`, "BGCs per tool": `antiSMASH ${na(g.BGCs_antismash)}, GECCO ${na(g.BGCs_gecco)}, DeepBGC ${na(g.BGCs_deepbgc)}, BGC-Prophet ${na(g.BGCs_bgc_prophet)}`})) +
+  `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div>', "wide") +
+  `<div style="height:18px"></div>` + card("BGC loci of this isolate", '<div id="tiso"></div>', "wide") +
+  `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div>')}
+   ${card("Read length and quality (first 5,000 reads)", '<div id="pl1" class="plot" style="height:250px"></div><div id="pq1" class="plot" style="height:250px"></div>')}</div>`;
+};
+P.isolate.after = arg => {
+  const iso = arg && GI[arg] ? arg : ISO[0];
+  if (!iso) return;
+  document.getElementById("isosel").onchange = e => location.hash = "isolate/" + encodeURIComponent(e.target.value);
+  const L = LOCI[iso] || [], res = (D.resistance || []).filter(r => r.isolate === iso);
+  let ctg = D.contigs.filter(c => c.isolate === iso).slice(0, 25);
+  if (!ctg.length) ctg = [...new Set(L.map(r => r.contig))].map(c => ({contig: c, length: Math.max(...L.filter(r => r.contig === c).map(r => num(r.end)))}));
+  const names = ctg.map(c => c.contig), show = new Set(names);
+  const tr = [{type: "bar", orientation: "h", name: "contig", y: names, x: ctg.map(c => num(c.length) / 1e6), base: 0, width: 0.25,
+    marker: {color: "#d9d7cd"}, hovertemplate: "%{y}: %{x:.2f} Mb<extra></extra>"}];
+  for (const n of NOV) { const rs = L.filter(r => r.novelty === n && show.has(r.contig)); if (!rs.length) continue;
+    tr.push({type: "bar", orientation: "h", name: NOVLAB[n], y: rs.map(r => r.contig), base: rs.map(r => num(r.start) / 1e6),
+      x: rs.map(r => Math.max((num(r.end) - num(r.start)) / 1e6, 0.004)), width: 0.7, marker: {color: NOVCOL[n]},
+      text: rs.map(r => `${r.locus_id} · score ${r.priority_score}<br>${r.tools}<br>${r.antismash_type !== "NA" ? r.antismash_type : ""} ${r.closest_MIBiG_compound !== "NA" ? "≈ " + r.closest_MIBiG_compound + " (" + r.MIBiG_similarity_pct + " %)" : ""}`),
+      textposition: "none", hovertemplate: "%{text}<extra></extra>"}); }
+  const rr = res.filter(r => show.has(r.contig));
+  if (rr.length) tr.push({type: "scatter", mode: "markers", name: "resistance gene", y: rr.map(r => r.contig), x: rr.map(r => num(r.start) / 1e6),
+    marker: {symbol: "triangle-down", size: 11, color: "#1f2a2a"}, text: rr.map(r => `${r.gene} (${r.drug})`), hovertemplate: "%{text}<extra></extra>", yaxis: "y"});
+  plot("pmap", tr, {barmode: "overlay", xaxis: {title: "position (Mb)", gridcolor: "#ecebe4"}, yaxis: {automargin: true, autorange: "reversed", type: "category"},
+    margin: {l: 10, r: 16, t: 10, b: 50}, height: Math.max(220, 46 * names.length + 100)});
+  table("tiso", L, bgcCols(false), {name: iso + "_loci"});
+  table("tres", res, [{l: "gene", k: "gene"}, {l: "drug class", k: "drug"}, {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1},
+    {l: "in BGC locus", v: r => L.filter(x => x.contig === r.contig && num(x.start) <= num(r.end) && num(r.start) <= num(x.end)).map(x => x.locus_id).join(", ") || "no"}], {name: iso + "_resistance"});
+  readHists("pl1", "pq1", [iso]);
+};
+
+P.controls = () => head("Controls", "Positive and negative controls",
+    `Positive controls are published antibiotic producers with characterised BGCs in MIBiG; the pipeline should find those BGCs (target ≥ 90 % with
+     any tool). Negative controls produce no known antibiotic and should give no novel candidate with score ≥ 5. A known BGC counts as found when it is
+     among a predicted BGC's MIBiG matches with ≥ 30 % similarity.`) +
+  `<div class="grid">${card("Known BGCs found per positive control", '<div id="prec" class="plot"></div>')}
+   ${card("Loci per control by novelty", '<div id="pcl" class="plot"></div>')}</div>` +
+  card("Recovery of expected MIBiG BGCs", '<div id="trec"></div>', "wide") + '<div style="height:18px"></div>' +
+  card("Verdict per control", '<div id="tcl"></div>', "wide") + '<div style="height:18px"></div>' +
+  card("Every expected BGC", '<div id="texp"></div>', "wide");
+P.controls.after = () => {
+  const R = D.controls.recovery, C = D.controls.loci, tools = ["antismash", "gecco", "deepbgc", "bgc_prophet", "any_tool"];
+  const lab = {antismash: "antiSMASH", gecco: "GECCO", deepbgc: "DeepBGC", bgc_prophet: "BGC-Prophet", any_tool: "any tool"};
+  plot("prec", tools.map((t, i) => ({type: "bar", name: lab[t], x: R.map(r => r.isolate.replace(/^pos_/, "")), y: R.map(r => 100 * num(r[t]) / num(r.expected)),
+    marker: {color: t === "any_tool" ? "#1f2a2a" : PALETTE[i]}, hovertemplate: "%{x}: %{y:.0f} %<extra>" + lab[t] + "</extra>"})),
+    {barmode: "group", yaxis: {title: "% of expected BGCs", range: [0, 105], gridcolor: "#ecebe4"}, xaxis: {tickangle: -30, automargin: true},
+     shapes: [{type: "line", y0: 90, y1: 90, xref: "paper", x0: 0, x1: 1, line: {dash: "dot", color: "#999"}}]});
+  plot("pcl", NOV.filter(n => C.length && n in C[0]).map(n => ({type: "bar", name: NOVLAB[n], x: C.map(r => r.isolate), y: C.map(r => num(r[n])), marker: {color: NOVCOL[n]}})),
+    {barmode: "stack", yaxis: {title: "loci", gridcolor: "#ecebe4"}, xaxis: {tickangle: -40, automargin: true}});
+  table("trec", R, Object.keys(R[0] || {}).map(k => ({l: k.replace(/_/g, " "), k, n: !["isolate", "in_run", "missed_by_all"].includes(k),
+    f: k === "isolate" ? isoLink : (k === "missed_by_all" ? v => esc(v).replace(/,/g, ", ") : undefined)})), {name: "controls_recovery"});
+  table("tcl", C, Object.keys(C[0] || {}).map(k => ({l: k.replace(/_/g, " "), k, n: !["isolate", "control", "verdict"].includes(k),
+    f: k === "isolate" ? isoLink : (k === "verdict" ? v => `<b style="color:${v === "PASS" ? "#2e7d32" : "#c62828"}">${esc(v)}</b>` : undefined)})), {name: "controls_loci"});
+  table("texp", D.controls.expected, [{l: "isolate", k: "isolate"}, {l: "MIBiG", k: "mibig_accession", f: v => mibigLink(v)}, {l: "compound", k: "compound"},
+    {l: "class", k: "mibig_class"}, {l: "bioactivity", k: "bioactivity"}, {l: "found by", k: "found_by"}], {name: "controls_expected"});
+};
+
+P.metadata = () => {
+  const cols = [...new Set(Object.values(META).flatMap(Object.keys))];
+  return head("Metadata", "Sample metadata",
+    `Everything known about each isolate besides the sequence: your own <code>metadata.tsv</code> in the project folder (tab-separated, first column
+     <code>isolate</code> with the same names as in <code>raw_data/</code>, any other columns) and, for the controls, <code>controls/control_panel.tsv</code>.
+     Metadata columns with 2–12 different values can colour the charts (top right).`) +
+  (cols.length ? "" : '<p class="muted">No metadata found for the isolates of this run.</p>') + card("", '<div id="tmeta"></div>', "wide");
+};
+P.metadata.after = () => {
+  const cols = [...new Set(Object.values(META).flatMap(Object.keys))];
+  table("tmeta", ISO.map(i => ({isolate: i, ...(META[i] || {})})), [{l: "isolate", k: "isolate", f: v => isoLink(v)}].concat(
+    cols.map(k => ({l: k.replace(/_/g, " "), k, f: /doi$/.test(k) ? doiLink : undefined}))), {link: true, name: "metadata"});
+};
+
+P.methods = () => head("Methods", "Software, settings and scoring",
+    `All numbers on these pages come from the tables the pipeline (<code>setup/bgc_pipeline.sh</code>${D.pipeline_version ? " v" + esc(D.pipeline_version) : ""})
+     writes in <code>_combined/summary/</code>. Steps: reads joined → NanoPlot (read QC) → Filtlong (filtering) → Flye (assembly) → QUAST and CheckM2 (genome
+     quality) → Bakta (genes) → antiSMASH, GECCO, DeepBGC, BGC-Prophet (BGCs) and RGI/CARD (resistance genes) → DIAMOND vs MIBiG → GTDB-Tk, GToTree and
+     BiG-SCAPE (all isolates together) → summary and ranking. A finished genome (.fna) as input skips the read steps.`) +
+  `<div class="grid">${card("Priority score of a locus", `<table><tbody>
+    <tr><td>novelty: novel candidate / related / other labels</td><td class="n">+3 / +1 / 0</td></tr>
+    <tr><td>antibiotic-relevant type (supported loci only)</td><td class="n">+2</td></tr>
+    <tr><td>each extra tool that predicts the locus</td><td class="n">+1</td></tr>
+    <tr><td>resistance gene (RGI/CARD) inside the locus</td><td class="n">+2</td></tr>
+    <tr><td>DeepBGC antibacterial or antifungal ≥ 0.5</td><td class="n">+1</td></tr>
+    <tr><td>cut by a contig edge</td><td class="n">−1</td></tr></tbody></table>
+    <p class="muted">Supported = antiSMASH found it or ≥ ${esc(setting("min_tools", "2"))} tools agree. Antibiotic-relevant types (antiSMASH):
+    ${esc(setting("abx_types", "–"))}. ML classes: ${esc(setting("ml_abx", "–"))}.</p>`)}
+   ${card("Settings used in this run", '<div id="tset"></div>')}</div>` +
+  card("Software versions", '<div id="tver"></div>', "wide");
+P.methods.after = () => {
+  table("tset", (D.settings || []).filter(s => !["results", "samples", "out"].includes(s.setting)), [{l: "setting", k: "setting"}, {l: "value", k: "value"}], {name: "settings"});
+  table("tver", D.versions, [{l: "environment", k: "environment"}, {l: "package", k: "package"}, {l: "version", k: "version"}], {name: "software_versions", max: 200});
+  const g = G.find(x => x.bakta_db && x.bakta_db !== "NA");
+  if (g) document.getElementById("tver").insertAdjacentHTML("beforeend", `<p class="muted">Bakta database: ${esc(g.bakta_db)}.</p>`);
+};
+
+// ---------- router ----------
+function render() {
+  const [page, ...rest] = (location.hash.slice(1) || "overview").split("/");
+  const p = P[page] ? page : "overview", arg = decodeURIComponent(rest.join("/"));
+  document.getElementById("nav").innerHTML = `<span class="brand">${esc(D.title)}</span>` +
+    PAGES.map(([k, l]) => `<a href="#${k}" class="${k === p ? "on" : ""}">${l}</a>`).join("") +
+    `<span class="sp"></span>` + (metaCols.length ? `<label>colour by <select id="colby"><option value="">–</option>${metaCols.map(c =>
+      `<option ${c === state.colorBy ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>` : "");
+  const cb = document.getElementById("colby"); if (cb) cb.onchange = e => { state.colorBy = e.target.value; render(); };
+  document.getElementById("main").innerHTML = P[p](arg);
+  if (P[p].after) P[p].after(arg);
+  document.getElementById("foot").innerHTML = `Built ${esc(D.built)} from <code>${esc(D.source)}</code>${D.pipeline_version ? " · pipeline v" + esc(D.pipeline_version) : ""}.
+    One self-contained file: share it as it is. Read and genome statistics are from the pipeline; histograms use the first 5,000 reads of each isolate.`;
+}
+window.onhashchange = () => { render(); window.scrollTo(0, 0); };
+render();
+</script>
+</body>
+</html>

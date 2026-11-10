@@ -46,38 +46,43 @@ The **Tag** matches the box in the flowchart and the `[tag]` at the end of every
 
 ---
 
-## Explore the results: interactive dashboard
+## Share the results: dashboard (one HTML file)
 
-The dashboard reads the results **directly on BioCloud** (no copying) and shows them in your browser:
+The pipeline's last step also writes **`results/_combined/summary/dashboard.html`** (and `results_controls/…` for the controls). It is one file with all results inside: open it in any browser or e-mail it to your supervisor. Nothing runs on BioCloud while someone looks at it.
 
-| Tab | Content |
+| Page | Content |
 |---|---|
-| BGC loci | Every locus: plot of MIBiG similarity vs priority score (hover for details) + filterable table, CSV/Excel export |
-| Per isolate | Loci per isolate by novelty, and which tools found them |
-| QC | CheckM2 completeness vs contamination (95 % / 5 % guides), assembly length vs contigs, read N50 vs quality, assembly depth, and the full QC table with PASS/CHECK |
-| Metadata | Your own sample information (`metadata.tsv`) and the control panel |
-| Controls | Recovery heatmap, verdicts and expected BGCs (after `check-controls`) |
+| Overview | Key numbers of the run, one card per step, the top BGC candidates |
+| 1. Sequencing | Flow cell, run, kit, barcode and Dorado basecall model (from the read headers); raw and filtered reads, read N50, mean/median Q, % reads > Q10, coverage; read-length and quality histograms (first 5,000 reads per isolate) |
+| 2. Assembly & quality | Flye contigs (circular/linear, depth), QUAST N50/GC, CheckM2 completeness vs contamination, Bakta gene counts |
+| 3. Taxonomy | GTDB-Tk classification, closest reference and ANI, possible new species |
+| 4. BGCs | Every locus with novelty, score, tools, MIBiG hit (linked) and resistance genes; filter by novelty and score |
+| 5. Isolates | One page per isolate: metadata, sequencing run, genome, a genome map with BGC loci and resistance genes |
+| Controls | Recovery of expected MIBiG BGCs and verdicts (after `check-controls`) |
+| Metadata | Your `metadata.tsv` and the control panel (all columns) |
+| Methods | Software versions, the settings of this run and the scoring rules |
 
-Filters on the left apply to every tab: isolates, a metadata column (also used for colours), novelty, minimum score, number of tools, resistance genes, free-text search. The "Results" list offers every `*/_combined/summary` in the project (your isolates and the controls).
+Every table can be searched, sorted and downloaded as CSV. Click an isolate to open its page. "Colour by" (top right) colours the charts by a metadata column.
 
-**On BioCloud**, in the terminal of your interactive session (VS Code / RStudio, not the login node):
+**Rebuild it** (e.g. after editing `metadata.tsv`). It takes seconds, and the login node is fine:
 
 ```bash
-bash setup/bgc_pipeline.sh setup        # once: installs the "dashboard" R environment
 bash setup/bgc_pipeline.sh dashboard
 ```
 
-It prints a link like `https://biocloud.bio.aau.dk/rnode/bio-node02/28770/`: open it in your browser. Stop with Ctrl+C.
-
-**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder, first column `isolate` (same names as in `raw_data/`), any other columns. Example: `dashboard/metadata_example.tsv`. The columns are added to every table and can be used to colour and filter.
-
-**On your own computer** (optional): copy a summary folder from BioCloud into the repository folder (run this on your computer),
+**Copy it to your computer** (run this on your computer, then double-click the file):
 
 ```bash
-scp -r ml12pe@student.aau.dk@bio-node02:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results_controls/_combined/summary controls_summary
+scp ml12pe@student.aau.dk@bio-fe01.srv.aau.dk:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results/_combined/summary/dashboard.html ~/Downloads/
 ```
 
-then `Rscript -e 'shiny::runApp("dashboard", launch.browser = TRUE)'` (needs `install.packages(c("shiny", "DT", "plotly", "bslib", "readr", "dplyr", "tidyr"))`). Report figures of the controls: `Rscript controls/plot_controls.R controls_summary`.
+**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder. The first column is `isolate`, with the same names as in `raw_data/`; add any other columns (site, soil type, date, inhibition assay, Gram stain, kit, device …). Example: `dashboard/metadata_example.tsv`.
+
+**Notes**
+- The charts use plotly.js. The builder puts it inside the file when it finds R's plotly package (e.g. the `dashboard` env made by `setup`), so the file also works offline. Otherwise the file loads plotly.js from the internet.
+- The run details come from the first read header. Reads downloaded from SRA/ENA have no such header, so those fields show "–".
+- Build without the pipeline: `python3 dashboard/build_site.py <summary folder> --project <project folder>` (python3 only).
+- The older interactive Shiny app still exists. It needs a running R session on a compute node: `bash setup/bgc_pipeline.sh dashboard-live` (see `dashboard/app.R`). Report figures of the controls: `Rscript controls/plot_controls.R <summary folder>`.
 
 ---
 
@@ -134,6 +139,8 @@ Fantastic-drugs-and-where-to-find-them/
     │   └── summary/              master_summary.tsv   ← start here
     │                             per_tool/{antismash,gecco,deepbgc,bgc_prophet}_bgcs.tsv
     │                             genome_summary.tsv, bgc_summary.tsv (antiSMASH-only ranking, as before)
+    │                             dashboard.html  ← all results in one file, to open or share
+    │                             contigs.tsv, reads_sample.tsv, resistance_genes.tsv, settings.tsv (for the dashboard)
     ├── slurm_logs/
     └── software_versions.tsv     exact version of every program (for your Methods)
 ```
@@ -149,6 +156,9 @@ Isolate names come from the file or folder names in `raw_data/`. For example, `S
 | Column | Meaning |
 |---|---|
 | `raw_reads`, `raw_bases`, `raw_read_N50`, `raw_meanQ` | Read data before filtering (also given after filtering, as `filtered_*`) |
+| `raw_median_Q`, `raw_median_length`, `raw_pct_reads_Q10/Q15/Q20` | From NanoPlot (all reads) |
+| `basecall_model`, `flow_cell_id`, `run_id`, `run_start`, `kit`, `barcode`, `ont_sample_id` | From the first read header (MinKNOW/Dorado); `NA` for reads from SRA/ENA |
+| `tRNA`, `rRNA`, `coding_density`, `bakta_db` | Bakta report (with `CDS`) |
 | `genome_length`, `contigs`, `N50`, `GC_percent` | Assembly statistics (QUAST) |
 | `circular_contigs`, `mean_depth` | From Flye. Note that *Streptomyces* chromosomes are linear, which is normal |
 | `completeness`, `contamination` | CheckM2 (%) |
@@ -314,13 +324,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.6.0 (last updated 2026-11-10) |
+| **Version** | 3.7.0 (last updated 2026-11-10) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.6.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.7.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

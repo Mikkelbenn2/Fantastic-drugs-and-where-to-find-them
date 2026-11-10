@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.6.0
+#  Version       3.7.0
 #  Created       2026-10-06
-#  Last updated  2026-11-06
+#  Last updated  2026-11-10
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -18,12 +18,17 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.6.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.7.0  2026-11-10  Shareable dashboard: the summary step also writes _combined/summary/dashboard.html, ONE
+#                       file with all results (sequencing run + basecalling, read QC, assembly, CheckM2, GTDB,
+#                       BGCs, controls, metadata, versions). "dashboard" rebuilds it (seconds, login node is fine);
+#                       the old Shiny app is now "dashboard-live". Summary adds contigs.tsv, reads_sample.tsv,
+#                       resistance_genes.tsv, settings.tsv and run/basecall/Bakta columns in genome_summary.tsv.
 #    3.6.0  2026-11-10  "submit --force STEP" now reaches the Slurm jobs (it was ignored before).
 #                       Ranking: novel_candidate needs an antibiotic-relevant type (ANTIBIOTIC_TYPES for antiSMASH,
 #                       ML_ANTIBIOTIC_CLASSES for loci found by >= 2 ML tools); other unknown BGCs = "novel_other".
@@ -79,7 +84,8 @@
 #    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
 #    Controls:  bash setup/bgc_pipeline.sh controls [--dry-run]   then, when the jobs are done:
 #               bash setup/bgc_pipeline.sh check-controls          (see controls/README.md)
-#    Dashboard: bash setup/bgc_pipeline.sh dashboard   (interactive results, QC + metadata, in the browser)
+#    Dashboard: bash setup/bgc_pipeline.sh dashboard   (rebuilds results*/_combined/summary/dashboard.html:
+#               one file to open in any browser or send to others; no server)
 #    Other folders: BGC_RAW_DIR=/abs/raw BGC_RESULTS_DIR=/abs/results bash setup/bgc_pipeline.sh ...
 #    Full instructions: README.md
 # =============================================================================
@@ -226,7 +232,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.6.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.7.0"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -707,7 +713,14 @@ step_summary() {
   python3 "$CL/summary.py" --results "$RESULTS_DIR" --samples "$names" \
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
-    --abx-types "$ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" >>"$STEP_LOG" 2>&1
+    --abx-types "$ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" >>"$STEP_LOG" 2>&1 || return 1
+  build_dashboard "$COMBINED_DIR/summary" >>"$STEP_LOG" 2>&1 || warn "dashboard.html not built (see $STEP_LOG)"
+}
+
+# Shareable dashboard: one HTML file with all summary tables inside (dashboard/build_site.py, python3 only)
+build_dashboard() {
+  [[ -f "$PROJECT_DIR/dashboard/build_site.py" ]] || return 0
+  python3 "$PROJECT_DIR/dashboard/build_site.py" "$1" --project "$PROJECT_DIR" --pipeline-version "$PIPELINE_VERSION"
 }
 
 process_combined() {
@@ -892,7 +905,7 @@ do_submit() {
 # =============================================================================
 write_summary_py() {
 cat >"$1" <<'PYTHON'
-import argparse, csv, glob, json, os, re, sys
+import argparse, csv, glob, gzip, json, math, os, re, sys
 from collections import defaultdict
 
 NA = "NA"
@@ -950,12 +963,83 @@ def genome_info(sd, s):
     g["contamination"] = pick(ck[0], "Contamination") if ck else NA
     g["CDS"] = NA
     txt = os.path.join(sd, "07_bakta", f"{s}.txt")
+    keys = {"CDSs": "CDS", "CDS": "CDS", "tRNAs": "tRNA", "rRNAs": "rRNA", "CRISPR arrays": "CRISPR_arrays",
+            "hypotheticals": "hypothetical_CDS", "Coding density": "coding_density", "Database": "bakta_db"}
     if os.path.isfile(txt):
         for line in open(txt):
-            m = re.match(r"\s*CDSs?:\s*(\d+)", line)
-            if m:
-                g["CDS"] = m.group(1)
+            m = re.match(r"\s*([A-Za-z ]+?):\s*(.+?)\s*$", line)
+            if m and m.group(1) in keys:
+                g[keys[m.group(1)]] = m.group(2)
+    ns = os.path.join(sd, "01_nanoplot", "NanoStats.txt")    # all reads (Filtlong's input)
+    if os.path.isfile(ns):
+        for line in open(ns):
+            k, _, v = line.strip().partition("\t") if "\t" in line else line.strip().partition(":")
+            k, v = k.strip().rstrip(":"), v.strip()
+            if k in ("median_read_length", "median_qual", "Median read length", "Median read quality"):
+                g["raw_median_" + ("length" if "length" in k else "Q")] = v.replace(",", "")
+            m = re.search(r"Q(10|15|20)\b", k)
+            p = re.search(r"\(([\d.]+)%\)", v)
+            if m and p and k.startswith((">", "Reads >")):
+                g[f"raw_pct_reads_Q{m.group(1)}"] = p.group(1)
     return g
+
+
+ERR = [10 ** (-max(c - 33, 0) / 10) for c in range(256)]
+
+
+def run_info(sd, s, n_reads=5000):
+    """ONT run + basecalling details from the first read header (MinKNOW key=value or Dorado SAM-style
+       tags), and length + mean quality of the first n_reads reads, for the dashboard's histograms."""
+    p = os.path.join(sd, "01_nanoplot", f"{s}.reads.fastq.gz")
+    if not os.path.exists(p):
+        return {}, []
+    head, reads, seq = "", [], b""
+    with gzip.open(p, "rb") as fh:
+        for i, line in enumerate(fh):
+            if i % 4 == 0 and not head:
+                head = line.decode(errors="replace").strip()
+            elif i % 4 == 1:
+                seq = line.rstrip()
+            elif i % 4 == 3:
+                q = line.rstrip()
+                if q:
+                    mq = -10 * math.log10(sum(map(ERR.__getitem__, q)) / len(q))
+                    reads.append({"isolate": s, "length": len(seq), "meanQ": round(mq, 1)})
+                if len(reads) >= n_reads:
+                    break
+    kv = dict(re.findall(r"(\w+)=(\S+)", head))
+    tag = dict(re.findall(r"(?:^|\s)([A-Za-z]{2}):[AZifB]:(\S+)", head))
+    find = lambda rx, txt=head: (re.search(rx, txt) or [None, NA])[1]
+    info = {"basecall_model": kv.get("basecall_model_version_id") or find(r"((?:dna|rna)\w*?_r[\d.]+_e[\d.]+_\w+?@v[\d.]+)"),
+            "flow_cell_id": kv.get("flow_cell_id") or find(r"(?<![A-Z0-9])([A-Z]{3}\d{5})(?!\d)", tag.get("fn", "")),
+            "run_id": kv.get("runid") or find(r"^([0-9a-f]{8,})_", tag.get("RG", "")),
+            "run_start": kv.get("start_time") or tag.get("st", NA),
+            "kit": find(r"(?<![A-Za-z0-9])((?:SQK|EXP)-[A-Z]+\d+(?:\.\d+)?(?:-\d+)?)"),
+            "barcode": kv.get("barcode") or find(r"(barcode\d+)"),
+            "ont_sample_id": kv.get("sample_id", NA)}
+    return info, reads
+
+
+def contig_rows(sd, s):
+    """one row per contig of the final genome: length (from the FASTA), Flye depth and circular flag"""
+    flye = {}
+    info = os.path.join(sd, "03_flye", "assembly_info.txt")
+    if os.path.isfile(info):
+        for line in open(info):
+            f = line.rstrip("\n").split("\t")
+            if not line.startswith("#") and len(f) > 3:
+                flye[f[0]] = (f[2], "yes" if f[3] == "Y" else "no")
+    lens, name = {}, None
+    for fa in (os.path.join(sd, "03_flye", f"{s}.fasta"), os.path.join(sd, "03_genome", f"{s}.fasta")):
+        if os.path.isfile(fa):
+            for line in open(fa):
+                if line.startswith(">"):
+                    name = line[1:].split()[0]; lens[name] = 0
+                elif name:
+                    lens[name] += len(line.strip())
+            break
+    return [{"isolate": s, "contig": c, "length": n, "depth": flye.get(c, (NA, NA))[0],
+             "circular": flye.get(c, (NA, NA))[1]} for c, n in sorted(lens.items(), key=lambda x: -x[1])]
 
 
 def antismash_regions(sd, s):
@@ -1284,7 +1368,7 @@ def main():
     taxa = gtdb(comb)
     fam, members, bs_ran = bigscape(comb, a.cutoff)
     refs = mibig_refs(a.mibig)
-    genomes, bgcs, calls, master = [], [], [], []
+    genomes, bgcs, calls, master, contigs, reads, resist = [], [], [], [], [], [], []
 
     for s in [x for x in a.samples.split(",") if x]:
         sd = os.path.join(a.results, s)
@@ -1292,7 +1376,10 @@ def main():
         genes = bakta_genes(sd, s)
         dbg, pro = deepbgc(sd), bgc_prophet(sd, s, genes)
         g = genome_info(sd, s)
-        g.update(taxa.get(s, {}))
+        ri, rd = run_info(sd, s)
+        g.update(ri); g.update(taxa.get(s, {}))
+        contigs += contig_rows(sd, s); reads += rd
+        resist += [{"isolate": s, **h} for h in res]
         g.update({"BGCs_antismash": len(regions), "BGCs_gecco": len(gec), "BGCs_deepbgc": len(dbg),
                   "BGCs_bgc_prophet": len(pro), "resistance_genes": len(res)})
         genomes.append(g)
@@ -1343,6 +1430,10 @@ def main():
     bgcs.sort(key=lambda r: (-r["priority_score"], -float(r["length_kb"])))
     bgcs = [{"rank": i, **r} for i, r in enumerate(bgcs, start=1)]
     write(os.path.join(a.out, "genome_summary.tsv"), genomes)
+    write(os.path.join(a.out, "contigs.tsv"), contigs)
+    write(os.path.join(a.out, "reads_sample.tsv"), reads)            # first 5000 reads per isolate
+    write(os.path.join(a.out, "resistance_genes.tsv"), resist)
+    write(os.path.join(a.out, "settings.tsv"), [{"setting": k, "value": v} for k, v in vars(a).items()])
     write(os.path.join(a.out, "bgc_summary.tsv"), bgcs)            # antiSMASH-based ranking (as before v3.3.0)
     for t in TOOLS:
         write(os.path.join(a.out, "per_tool", f"{t}_bgcs.tsv"), [c for c in calls if c["tool"] == t])
@@ -1429,7 +1520,15 @@ case "$CMD" in
     bash "$PROJECT_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
     next=submit; [[ $DRY_RUN -eq 1 ]] && next=run
     BGC_RAW_DIR="$CTRL_RAW" BGC_RESULTS_DIR="$CTRL_RES" exec bash "$SCRIPT_PATH" "$next" "${ARGS[@]}" ;;
-  dashboard)   # interactive results browser (dashboard/app.R), reads results/ and results_controls/ in place
+  dashboard)   # rebuild the shareable dashboard.html of every results folder (fast, no Slurm needed)
+    found=0
+    for d in "$PROJECT_DIR"/results*/_combined/summary; do
+      [[ -f "$d/master_summary.tsv" ]] || continue
+      build_dashboard "$d" && found=1
+    done
+    [[ $found -eq 1 ]] || die "No finished results (results*/_combined/summary/master_summary.tsv) to build a dashboard from"
+    echo "Open it in a browser, or copy it to your computer and send it (see README: 'Share the results')." ;;
+  dashboard-live)   # interactive Shiny app (dashboard/app.R) on a compute node; needs the "dashboard" env
     find_conda
     [[ -d "$ENV_DIR/dashboard/conda-meta" ]] || die "Dashboard env missing — run: bash $SCRIPT_PATH setup"
     port=${DASHBOARD_PORT:-$(( 20000 + RANDOM % 20000 ))}
@@ -1442,7 +1541,8 @@ case "$CMD" in
     BGC_PROJECT="$PROJECT_DIR" exec "$CONDA_RUN" run --no-capture-output -p "$ENV_DIR/dashboard" \
       Rscript -e "shiny::runApp('$PROJECT_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
   check-controls)
-    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" ;;
+    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" \
+      && build_dashboard "$PROJECT_DIR/results_controls/_combined/summary" ;;   # adds the Controls page
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;
 esac
