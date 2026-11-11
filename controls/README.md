@@ -85,6 +85,25 @@ On your own computer: copy the summary folder first (see "Explore the results on
 
 If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results_controls/slurm_logs/combined_*.out`.
 
+## Performance metrics: confusion matrix, sensitivity, specificity, ROC/AUC
+
+`check-controls` also runs `controls/evaluate_controls.py`. It writes `eval_*.tsv` next to the other tables, the dashboard's Controls page shows them, and `plot_controls.R` draws them as `fig_evaluation` (A: ROC curves, B: confusion matrix, C: sensitivity per tool). It answers two questions, each with its own truth:
+
+| Question | Unit | Truth | Metrics |
+|---|---|---|---|
+| **1. Detection:** are the known BGCs found? | expected MIBiG BGC of a positive control | `expected_bgcs.tsv` | Sensitivity (recall) per tool and for any tool, with 95 % CI (Wilson). Over-calling as loci per Mb in the negatives |
+| **2. Antibiotic ranking:** does the evidence rank antibiotic BGCs high? | BGC locus of a control | **positive** = matches an expected BGC with `antimicrobial = yes`; **negative** = every locus of a negative control, and loci matching only non-antimicrobial BGCs (siderophores, pigments, terpenes …) | Confusion matrix; sensitivity, specificity, precision, NPV, accuracy, balanced accuracy, F1, MCC; ROC curve and AUC (with 95 % CI, Hanley & McNeil) |
+| **3. Genome level** | strain | positive vs negative control | 2 × 2 table: predicted producer = at least 1 novel candidate with score ≥ 5. Only 12 genomes, so treat it as a sanity check |
+
+How question 2 works:
+- **Truth column.** `antimicrobial` in `expected_bgcs.tsv` is `yes` when the compound is a named antibiotic in the control's paper (`control_panel.tsv`) or MIBiG lists it as antibacterial/antifungal. Five borderline BGCs were checked in the literature and set by hand: toxoflavin and coelimycin are `yes`; erythrochelin, the SGR PTMs and the bacillothiazols are `no`. The column `antimicrobial_evidence` gives the source, with a DOI for the hand-set ones.
+- **Score.** In the controls every BGC is known, so the priority score would always give it 0 novelty points. The evaluation therefore uses the **novelty-blind score**: the priority score without the novelty points. It asks: "would the evidence (type, tool agreement, resistance gene, DeepBGC activity) have ranked this BGC high if it were new?"
+- **Flagged** means a blind score ≥ 2. A new locus with that blind score reaches the "strong candidate" level, a priority score ≥ 5.
+- **Left out.** Loci of producers that match no expected BGC are left out. They may be real, uncharacterised clusters, so their truth is unknown.
+- **Misses.** Antimicrobial BGCs that no tool found count as false negatives.
+
+**Limits.** The truth only covers characterised BGCs. A specificity for detection itself cannot be computed, because even the negative strains have real BGCs (e.g. enterobactin). The AUCs are based on about 25 positive loci, so their confidence intervals are wide.
+
 ## What counts as a pass
 
 | Check | Expected |
@@ -102,5 +121,4 @@ If it stops with "master_summary.tsv not found", the pipeline's last (combined) 
 **Counting rule.** A known BGC counts as found when it is among a predicted BGC's MIBiG matches with ≥ 30 % similarity (column `MIBiG_all_hits`), not only the best match, so clusters that antiSMASH merges into one region still count. Target: ≥ 90 % with any tool.
 
 **Limits.**
-- **Top hit only:** the checker counts a BGC as found only when it is the *top* MIBiG hit of a predicted BGC. Neighbouring clusters that antiSMASH merges into one region, such as the *Bacillus* lipopeptides, can therefore show as missed. Look those up in `per_tool/antismash_bgcs.tsv` before calling them misses.
 - **Absence of evidence:** a negative means "no antibiotic known". Proving that a strain makes none is not possible.

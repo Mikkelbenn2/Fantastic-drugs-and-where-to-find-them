@@ -50,7 +50,8 @@ data = {
     "resistance": rows(summ, "resistance_genes.tsv"), "settings": rows(summ, "settings.tsv"),
     "versions": versions, "metadata": meta,
     "controls": {"recovery": rows(summ, "controls_recovery.tsv"), "loci": rows(summ, "controls_loci.tsv"),
-                 "expected": rows(summ, "controls_expected_bgcs.tsv")},
+                 "expected": rows(summ, "controls_expected_bgcs.tsv"),
+                 **{k: rows(summ, f"eval_{k}.tsv") for k in ("confusion", "metrics", "auc", "roc", "detection")}},
 }
 
 

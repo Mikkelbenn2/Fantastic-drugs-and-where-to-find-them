@@ -424,12 +424,35 @@ P.controls = () => head("Controls", "Positive and negative controls",
     `Positive controls are published antibiotic producers with characterised BGCs in MIBiG; the pipeline should find those BGCs (target ≥ 90 % with
      any tool). Negative controls produce no known antibiotic and should give no novel candidate with score ≥ 5. A known BGC counts as found when it is
      among a predicted BGC's MIBiG matches with ≥ 30 % similarity.`) +
+  (D.controls.confusion.length ? `<div class="grid">${card("Does the evidence rank antibiotic BGCs high? (ROC)", '<div id="proc" class="plot" style="height:440px"></div><div id="tauc"></div>')}
+   ${card("Confusion matrix and metrics", '<div id="cm"></div><div id="tmet"></div>')}
+   ${card("Detection of known BGCs per tool", '<div id="tdet"></div><p class="muted">Sensitivity = expected MIBiG BGCs found. Loci per Mb in the negative controls shows over-calling.</p>', "wide")}</div>
+   <p class="muted">Truth: a locus matching an expected BGC that is a named antibiotic in the control paper or antibacterial/antifungal in MIBiG is positive;
+   loci of negative controls and loci matching only non-antimicrobial BGCs are negative; other loci of producers are left out (truth unknown).
+   Score = priority score without novelty points ("blind score"). See controls/evaluate_controls.py.</p>` : "") +
   `<div class="grid">${card("Known BGCs found per positive control", '<div id="prec" class="plot"></div>')}
    ${card("Loci per control by novelty", '<div id="pcl" class="plot"></div>')}</div>` +
   card("Recovery of expected MIBiG BGCs", '<div id="trec"></div>', "wide") + '<div style="height:18px"></div>' +
   card("Verdict per control", '<div id="tcl"></div>', "wide") + '<div style="height:18px"></div>' +
   card("Every expected BGC", '<div id="texp"></div>', "wide");
 P.controls.after = () => {
+  if (D.controls.confusion.length) {
+    const E = D.controls, rocs = by(E.roc, "score");
+    plot("proc", Object.keys(rocs).map((k, i) => ({type: "scatter", mode: "lines", name: `${k} (AUC ${fmt((E.auc.find(a => a.score === k) || {}).AUC, 2)})`,
+      x: rocs[k].map(r => num(r.FPR)), y: rocs[k].map(r => num(r.TPR)), line: {color: PALETTE[i], width: 2}})).concat([{type: "scatter", mode: "lines",
+      x: [0, 1], y: [0, 1], line: {dash: "dot", color: "#999"}, showlegend: false, hoverinfo: "skip"}]),
+      {xaxis: {title: "false positive rate (1 − specificity)", range: [0, 1], gridcolor: "#ecebe4"}, yaxis: {title: "true positive rate (sensitivity)", range: [0, 1.02], gridcolor: "#ecebe4"}});
+    table("tauc", E.auc, [{l: "score", k: "score"}, {l: "AUC", k: "AUC", n: 1, d: 2}, {l: "95 % CI", v: a => `${fmt(a.ci95_low, 2)}–${fmt(a.ci95_high, 2)}`},
+      {l: "positives", k: "positives", n: 1}, {l: "negatives", k: "negatives", n: 1}], {name: "eval_auc"});
+    const c = E.confusion[0], cell = (t, n, ok) => `<td style="background:${ok ? "#e4ecea" : "#f6e1d6"};text-align:center;padding:14px"><b>${t}</b><br>${n}</td>`;
+    document.getElementById("cm").innerHTML = `<p class="muted">${esc(c.level)}</p><table style="width:auto;margin-bottom:14px"><tr><th></th><th>flagged</th><th>not flagged</th></tr>
+      <tr><th>antibiotic BGC</th>${cell("TP", c.TP, 1)}${cell("FN", c.FN, 0)}</tr><tr><th>other BGC</th>${cell("FP", c.FP, 0)}${cell("TN", c.TN, 1)}</tr></table>`;
+    table("tmet", E.metrics, [{l: "level", k: "level"}, {l: "metric", k: "metric"}, {l: "value", k: "value", n: 1, d: 2},
+      {l: "95 % CI", v: m => num(m.ci95_low) === null ? "–" : `${fmt(m.ci95_low, 2)}–${fmt(m.ci95_high, 2)}`}], {name: "eval_metrics", max: 30});
+    table("tdet", E.detection, [{l: "tool", k: "tool"}, {l: "expected", k: "expected_bgcs", n: 1}, {l: "found", k: "found", n: 1},
+      {l: "sensitivity", k: "sensitivity", n: 1, d: 2}, {l: "95 % CI", v: d => `${fmt(d.ci95_low, 2)}–${fmt(d.ci95_high, 2)}`},
+      {l: "loci in negatives", k: "loci_in_negatives", n: 1}, {l: "loci per Mb", k: "loci_per_Mb_in_negatives", n: 1, d: 2}], {name: "eval_detection"});
+  }
   const R = D.controls.recovery, C = D.controls.loci, tools = ["antismash", "gecco", "deepbgc", "bgc_prophet", "any_tool"];
   const lab = {antismash: "antiSMASH", gecco: "GECCO", deepbgc: "DeepBGC", bgc_prophet: "BGC-Prophet", any_tool: "any tool"};
   plot("prec", tools.map((t, i) => ({type: "bar", name: lab[t], x: R.map(r => r.isolate.replace(/^pos_/, "")), y: R.map(r => 100 * num(r[t]) / num(r.expected)),

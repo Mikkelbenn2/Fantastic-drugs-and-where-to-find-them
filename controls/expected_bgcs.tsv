@@ -1,59 +1,59 @@
-isolate	control	mibig_accession	compound	mibig_class	bioactivity	mibig_locus
-neg_Ecoli_K12_MG1655	negative	BGC0002476	enterobactin	NRPS	NA	U00096.3
-pos_Bvelezensis_FZB42	positive	BGC0000176	difficidin	PKS	antibacterial	AJ634062.2
-pos_Bvelezensis_FZB42	positive	BGC0000181	macrolactin H	PKS	antibacterial,antifungal,cytotoxic	AJ634061.2
-pos_Bvelezensis_FZB42	positive	BGC0000433	surfactin	NRPS	antibacterial,surfactant	AJ575642.1
-pos_Bvelezensis_FZB42	positive	BGC0000569	plantazolicin	ribosomal	antibacterial	FN668567.1
-pos_Bvelezensis_FZB42	positive	BGC0000616	amylocyclicin	ribosomal	antibacterial	CP000560.1
-pos_Bvelezensis_FZB42	positive	BGC0001089	bacillaene	NRPS+PKS	NA	AJ634060.2
-pos_Bvelezensis_FZB42	positive	BGC0001090	bacillomycin D	NRPS+PKS	antifungal	CP000560.1
-pos_Bvelezensis_FZB42	positive	BGC0001095	fengycin	NRPS	antifungal,surfactant	CP000560.1
-pos_Bvelezensis_FZB42	positive	BGC0001184	bacilysin	other	antibacterial	CP000560.1
-pos_Bvelezensis_FZB42	positive	BGC0001185	bacillibactin	NRPS	siderophore	CP000560.1
-pos_Bvelezensis_FZB42	positive	BGC0002641	bacillothiazol A;bacillothiazol B;bacillothiazol C;bacillothiazol D;bacillothiazol E;bacillothiazol F;bacillothiazol G;bacillothiazol H;bacillothiazol I;bacillothiazol J;bacillothiazol K;bacillothiazol L;bacillothiazol M;bacillothiazol N	NRPS	NA	CP000560.2
-pos_Pprotegens_Pf-5	positive	BGC0000127	pyoluteorin	PKS	antifungal	AF081920.3
-pos_Pprotegens_Pf-5	positive	BGC0000399	orfamide A;orfamide C	NRPS	antialgal,antifungal,surfactant	CP000076.1
-pos_Pprotegens_Pf-5	positive	BGC0000413	Pf-5 pyoverdine	NRPS	siderophore	CP000076.1
-pos_Pprotegens_Pf-5	positive	BGC0002152	toxoflavin	other	NA	CP000076.1
-pos_Scoelicolor_A3-2	positive	BGC0000038	coelimycin P1	PKS	NA	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000194	actinorhodin	PKS	NA	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000315	CDA1b;CDA2a;CDA2b;CDA3a;CDA3b;CDA4a;CDA4b	NRPS	antibacterial	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000324	coelibactin	NRPS	ionophore,siderophore	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000325	coelichelin	NRPS	siderophore	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000551	SapB	ribosomal	morphogen,surfactant	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000595	SCO-2138	ribosomal	NA	NC_003888.3
-pos_Scoelicolor_A3-2	positive	BGC0000660	albaflavenone	terpene	antibacterial	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000663	hopene	terpene	antiparasidal,cytotoxic	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000849	SCB1;SCB2;SCB3	other	signalling	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000910	melanin	other	NA	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0000914	methylenomycin A	other	antibacterial,antifungal	AL589148.1
-pos_Scoelicolor_A3-2	positive	BGC0000940	desferrioxamin B;desferrioxamine E	other	siderophore	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0001063	undecylprodigiosin	NRPS+PKS	antibacterial,antifungal,cytotoxic	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0001181	geosmin	terpene	NA	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0002127	flaviolin;1,3,6,8-tetrahydroxynaphthalene	PKS	NA	AL645882.2
-pos_Scoelicolor_A3-2	positive	BGC0002128	5-dimethylallylindole-3-acetonitrile	other	NA	AL645882.2
-pos_Svenezuelae_ATCC10712	positive	BGC0000234	jadomycin	PKS	antibacterial,cytotoxic	AF126429.1
-pos_Svenezuelae_ATCC10712	positive	BGC0000563	venezuelin	ribosomal	NA	HQ328852.1
-pos_Svenezuelae_ATCC10712	positive	BGC0000893	chloramphenicol	NRPS	antibacterial,antiviral	FR845719.1
-pos_Svenezuelae_ATCC10712	positive	BGC0001801	thiazostatin;watasemycin A;watasemycin B;2-hydroxyphenylthiazoline enantiopyochelin;isopyochelin	NRPS	antibacterial,antifungal	FR845719.1
-pos_Svenezuelae_ATCC10712	positive	BGC0002578	gaburedin A;gaburedin B;gaburedin C;gaburedin D;gaburedin E;gaburedin F	other	NA	FR845719.1
-pos_Ecoli_Nissle1917	positive	BGC0000589	microcin M	ribosomal	surfactant	AJ586887.1
-pos_Serythraea_NRRL2338	positive	BGC0000055	erythromycin A, erythromycin B, erythromycin C, erythromycin D	PKS+saccharide	antibacterial,inhibitor	AM420293.1
-pos_Serythraea_NRRL2338	positive	BGC0000349	erythrochelin	NRPS	antibacterial,siderophore	AM420293.1
-pos_Serythraea_NRRL2338	positive	BGC0000513	Ery-9, Ery-6, Ery-8, Ery-7, Ery-5, Ery-4, Ery-3	ribosomal	NA	AM420293.1
-pos_Serythraea_NRRL2338	positive	BGC0000659	2-methylisoborneol	terpene	NA	AM420293.1
-pos_Serythraea_NRRL2338	positive	BGC0000902	flaviolin	PKS	NA	AM420293.1
-pos_Sgriseus_NBRC13350	positive	BGC0000282	2-methoxy-5-methyl-6-(13-methyltetradecyl)-1,4-benzoquinone, 2-methoxy-5-methyl-6-(13-methyltetradecyl)phenol	PKS	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000496	AmfS	ribosomal	morphogen	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000583	grisemycin	ribosomal	antibacterial	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000649	carotenoid	terpene	NA	AF272737.1
-pos_Sgriseus_NBRC13350	positive	BGC0000658	2-methylisoborneol	terpene	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000662	grixazone A	terpene	pigment	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000664	isorenieratene	terpene	antioxidant,pigment	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000724	streptomycin	saccharide	antibacterial	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000848	A-factor	other	regulatory	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000911	melanin	other	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000912	melanin	other	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0000941	desferrioxamin B	other	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0001043	SGR PTMs, SGR PTM Compound b, SGR PTM Compound c, SGR PTM Compound d	NRPS+PKS	NA	AP009493.1
-pos_Sgriseus_NBRC13350	positive	BGC0002673	iminimycin A, iminimycin B	PKS+other	antibacterial,cytotoxic	AP009493.1
+isolate	control	mibig_accession	compound	mibig_class	bioactivity	mibig_locus	antimicrobial	antimicrobial_evidence
+neg_Ecoli_K12_MG1655	negative	BGC0002476	enterobactin	NRPS	NA	U00096.3	no	-
+pos_Bvelezensis_FZB42	positive	BGC0000176	difficidin	PKS	antibacterial	AJ634062.2	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0000181	macrolactin H	PKS	antibacterial,antifungal,cytotoxic	AJ634061.2	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0000433	surfactin	NRPS	antibacterial,surfactant	AJ575642.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0000569	plantazolicin	ribosomal	antibacterial	FN668567.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0000616	amylocyclicin	ribosomal	antibacterial	CP000560.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0001089	bacillaene	NRPS+PKS	NA	AJ634060.2	yes	control paper
+pos_Bvelezensis_FZB42	positive	BGC0001090	bacillomycin D	NRPS+PKS	antifungal	CP000560.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0001095	fengycin	NRPS	antifungal,surfactant	CP000560.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0001184	bacilysin	other	antibacterial	CP000560.1	yes	control paper+MIBiG bioactivity
+pos_Bvelezensis_FZB42	positive	BGC0001185	bacillibactin	NRPS	siderophore	CP000560.1	no	-
+pos_Bvelezensis_FZB42	positive	BGC0002641	bacillothiazol A;bacillothiazol B;bacillothiazol C;bacillothiazol D;bacillothiazol E;bacillothiazol F;bacillothiazol G;bacillothiazol H;bacillothiazol I;bacillothiazol J;bacillothiazol K;bacillothiazol L;bacillothiazol M;bacillothiazol N	NRPS	NA	CP000560.2	no	curated: no antimicrobial activity of bacillothiazols found in MIBiG or a PubMed search
+pos_Pprotegens_Pf-5	positive	BGC0000127	pyoluteorin	PKS	antifungal	AF081920.3	yes	control paper+MIBiG bioactivity
+pos_Pprotegens_Pf-5	positive	BGC0000399	orfamide A;orfamide C	NRPS	antialgal,antifungal,surfactant	CP000076.1	yes	control paper+MIBiG bioactivity
+pos_Pprotegens_Pf-5	positive	BGC0000413	Pf-5 pyoverdine	NRPS	siderophore	CP000076.1	no	-
+pos_Pprotegens_Pf-5	positive	BGC0002152	toxoflavin	other	NA	CP000076.1	yes	curated: toxoflavin from Pf-5 inhibits plant-pathogenic bacteria (Philmus 2015, doi:10.1002/cbic.201500247)
+pos_Scoelicolor_A3-2	positive	BGC0000038	coelimycin P1	PKS	NA	AL645882.2	yes	curated: the cpk cluster makes the antibiotic coelimycin A; P1 is its inactive derivative (Bednarz 2019, doi:10.1007/s00253-019-09975-w)
+pos_Scoelicolor_A3-2	positive	BGC0000194	actinorhodin	PKS	NA	AL645882.2	yes	control paper
+pos_Scoelicolor_A3-2	positive	BGC0000315	CDA1b;CDA2a;CDA2b;CDA3a;CDA3b;CDA4a;CDA4b	NRPS	antibacterial	AL645882.2	yes	control paper+MIBiG bioactivity
+pos_Scoelicolor_A3-2	positive	BGC0000324	coelibactin	NRPS	ionophore,siderophore	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000325	coelichelin	NRPS	siderophore	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000551	SapB	ribosomal	morphogen,surfactant	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000595	SCO-2138	ribosomal	NA	NC_003888.3	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000660	albaflavenone	terpene	antibacterial	AL645882.2	yes	MIBiG bioactivity
+pos_Scoelicolor_A3-2	positive	BGC0000663	hopene	terpene	antiparasidal,cytotoxic	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000849	SCB1;SCB2;SCB3	other	signalling	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000910	melanin	other	NA	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0000914	methylenomycin A	other	antibacterial,antifungal	AL589148.1	yes	control paper+MIBiG bioactivity
+pos_Scoelicolor_A3-2	positive	BGC0000940	desferrioxamin B;desferrioxamine E	other	siderophore	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0001063	undecylprodigiosin	NRPS+PKS	antibacterial,antifungal,cytotoxic	AL645882.2	yes	control paper+MIBiG bioactivity
+pos_Scoelicolor_A3-2	positive	BGC0001181	geosmin	terpene	NA	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0002127	flaviolin;1,3,6,8-tetrahydroxynaphthalene	PKS	NA	AL645882.2	no	-
+pos_Scoelicolor_A3-2	positive	BGC0002128	5-dimethylallylindole-3-acetonitrile	other	NA	AL645882.2	no	-
+pos_Svenezuelae_ATCC10712	positive	BGC0000234	jadomycin	PKS	antibacterial,cytotoxic	AF126429.1	yes	control paper+MIBiG bioactivity
+pos_Svenezuelae_ATCC10712	positive	BGC0000563	venezuelin	ribosomal	NA	HQ328852.1	no	-
+pos_Svenezuelae_ATCC10712	positive	BGC0000893	chloramphenicol	NRPS	antibacterial,antiviral	FR845719.1	yes	control paper+MIBiG bioactivity
+pos_Svenezuelae_ATCC10712	positive	BGC0001801	thiazostatin;watasemycin A;watasemycin B;2-hydroxyphenylthiazoline enantiopyochelin;isopyochelin	NRPS	antibacterial,antifungal	FR845719.1	yes	MIBiG bioactivity
+pos_Svenezuelae_ATCC10712	positive	BGC0002578	gaburedin A;gaburedin B;gaburedin C;gaburedin D;gaburedin E;gaburedin F	other	NA	FR845719.1	no	-
+pos_Ecoli_Nissle1917	positive	BGC0000589	microcin M	ribosomal	surfactant	AJ586887.1	yes	control paper
+pos_Serythraea_NRRL2338	positive	BGC0000055	erythromycin A, erythromycin B, erythromycin C, erythromycin D	PKS+saccharide	antibacterial,inhibitor	AM420293.1	yes	control paper+MIBiG bioactivity
+pos_Serythraea_NRRL2338	positive	BGC0000349	erythrochelin	NRPS	antibacterial,siderophore	AM420293.1	no	curated: putative siderophore, no antibacterial activity shown (Lazos 2010, doi:10.1016/j.chembiol.2010.01.011); MIBiG tag not followed
+pos_Serythraea_NRRL2338	positive	BGC0000513	Ery-9, Ery-6, Ery-8, Ery-7, Ery-5, Ery-4, Ery-3	ribosomal	NA	AM420293.1	no	-
+pos_Serythraea_NRRL2338	positive	BGC0000659	2-methylisoborneol	terpene	NA	AM420293.1	no	-
+pos_Serythraea_NRRL2338	positive	BGC0000902	flaviolin	PKS	NA	AM420293.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000282	2-methoxy-5-methyl-6-(13-methyltetradecyl)-1,4-benzoquinone, 2-methoxy-5-methyl-6-(13-methyltetradecyl)phenol	PKS	NA	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000496	AmfS	ribosomal	morphogen	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000583	grisemycin	ribosomal	antibacterial	AP009493.1	yes	control paper+MIBiG bioactivity
+pos_Sgriseus_NBRC13350	positive	BGC0000649	carotenoid	terpene	NA	AF272737.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000658	2-methylisoborneol	terpene	NA	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000662	grixazone A	terpene	pigment	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000664	isorenieratene	terpene	antioxidant,pigment	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000724	streptomycin	saccharide	antibacterial	AP009493.1	yes	control paper+MIBiG bioactivity
+pos_Sgriseus_NBRC13350	positive	BGC0000848	A-factor	other	regulatory	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000911	melanin	other	NA	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000912	melanin	other	NA	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0000941	desferrioxamin B	other	NA	AP009493.1	no	-
+pos_Sgriseus_NBRC13350	positive	BGC0001043	SGR PTMs, SGR PTM Compound b, SGR PTM Compound c, SGR PTM Compound d	NRPS+PKS	NA	AP009493.1	no	curated: new PTMs from a cryptic cluster, no antimicrobial activity reported (Luo 2013, doi:10.1038/ncomms3894)
+pos_Sgriseus_NBRC13350	positive	BGC0002673	iminimycin A, iminimycin B	PKS+other	antibacterial,cytotoxic	AP009493.1	yes	control paper+MIBiG bioactivity

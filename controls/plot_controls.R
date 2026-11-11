@@ -9,6 +9,8 @@
 #   fig_controls_overview  A recovery of known BGCs, B loci per control by novelty, C priority scores
 #   fig_recovery           A alone (main text)
 #   fig_expected_bgcs      every expected MIBiG BGC and which tool found it (supplementary)
+#   fig_evaluation         A ROC curves + AUC, B confusion matrix, C sensitivity per tool
+#                          (only when controls/evaluate_controls.py has written the eval_*.tsv tables)
 
 suppressPackageStartupMessages({
   library(readr); library(dplyr); library(tidyr); library(ggplot2)
@@ -168,4 +170,35 @@ overview <- (p_recovery | (p_novelty / p_scores)) +
 save_both(overview & theme(legend.text = element_text(size = 8)), "fig_controls_overview", 270, 240)
 save_both(p_recovery, "fig_recovery", 180, 110)
 save_both(p_per_bgc, "fig_expected_bgcs", 180, 40 + 4.2 * nrow(distinct(expected, mibig_accession)))
+
+# ---- evaluation: ROC, confusion matrix, sensitivity per tool (controls/evaluate_controls.py) ----
+if (all(file.exists(file.path(summ_dir, c("eval_roc.tsv", "eval_auc.tsv", "eval_confusion.tsv", "eval_detection.tsv"))))) {
+  rd <- function(f) read_tsv(file.path(summ_dir, f), show_col_types = FALSE, na = "NA")
+  aucs <- rd("eval_auc.tsv") |> mutate(lab = sprintf("%s (AUC %.2f)", score, AUC))
+  rocs <- rd("eval_roc.tsv") |> left_join(select(aucs, score, lab), by = "score")
+  p_roc <- ggplot(rocs, aes(FPR, TPR, colour = lab)) +
+    geom_abline(linetype = "dashed", colour = "grey60") + geom_path(linewidth = 0.8) +
+    scale_colour_manual(values = c("#2e5e5a", "#D55E00", "#2271B2", "#E69F00"), name = NULL) +
+    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+    labs(title = "Ranking of antibiotic BGCs", x = "False positive rate (1 - specificity)", y = "True positive rate (sensitivity)") +
+    theme(legend.position = "bottom", legend.direction = "vertical")
+  cm <- rd("eval_confusion.tsv") |> slice(1)
+  cm_long <- tibble(truth = c("Antibiotic BGC", "Antibiotic BGC", "Other BGC", "Other BGC"),
+                    pred = c("Flagged", "Not flagged", "Flagged", "Not flagged"),
+                    n = c(cm$TP, cm$FN, cm$FP, cm$TN), what = c("TP", "FN", "FP", "TN"))
+  p_cm <- ggplot(cm_long, aes(pred, fct_rev(truth), fill = what %in% c("TP", "TN"))) +
+    geom_tile(colour = "white", linewidth = 1) + geom_text(aes(label = paste0(what, "\n", n)), size = 4.5) +
+    scale_fill_manual(values = c(`TRUE` = "#cfe3e0", `FALSE` = "#f6d5c4"), guide = "none") +
+    labs(title = "Confusion matrix (loci)", subtitle = sub("^locus: ", "", cm$level), x = "Pipeline", y = "Truth") +
+    theme(axis.line = element_blank(), axis.ticks = element_blank())
+  det <- rd("eval_detection.tsv") |> mutate(tool = factor(c(tool_lab, any_tool = "Any tool")[tool], levels = c(tool_lab, "Any tool")))
+  p_det <- ggplot(det, aes(tool, sensitivity)) + geom_col(fill = "#2e5e5a", width = 0.6) +
+    geom_errorbar(aes(ymin = ci95_low, ymax = ci95_high), width = 0.2) +
+    geom_hline(yintercept = 0.9, linetype = "dashed", colour = "grey50") +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+    scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+    labs(title = "Detection of known BGCs", subtitle = "error bars: 95 % CI (Wilson); dashed: 90 % target", x = NULL, y = "Sensitivity")
+  save_both((p_roc | (p_cm / p_det)) + plot_layout(widths = c(1.2, 1)) + plot_annotation(tag_levels = "A"),
+            "fig_evaluation", 250, 180)
+}
 message("Figures written to ", normalizePath(out_dir))

@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.7.0
+#  Version       3.7.1
 #  Created       2026-10-06
-#  Last updated  2026-11-10
+#  Last updated  2026-11-11
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -18,12 +18,17 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.1 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.7.1  2026-11-11  check-controls also runs controls/evaluate_controls.py: confusion matrix, sensitivity,
+#                       specificity, accuracy, F1, MCC, ROC/AUC (eval_*.tsv, dashboard Controls page,
+#                       fig_evaluation). expected_bgcs.tsv gets an "antimicrobial" truth column.
+#                       BiG-SCAPE with 0 antiSMASH regions now fails instead of being marked done (it was then
+#                       skipped for good, and every locus showed bigscape_family "not_run").
 #    3.7.0  2026-11-10  Shareable dashboard: the summary step also writes _combined/summary/dashboard.html, ONE
 #                       file with all results (sequencing run + basecalling, read QC, assembly, CheckM2, GTDB,
 #                       BGCs, controls, metadata, versions). "dashboard" rebuilds it (seconds, login node is fine);
@@ -232,7 +237,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.7.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.7.1"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -694,8 +699,9 @@ step_bigscape() {
       cp "$f" "$out/input/${name}__$(basename "$f")"; n=$((n + 1))   # sample prefix avoids name clashes
     done
   done < <(finished_genomes)
-  log "    $n BGC regions collected"
-  [[ $DRY_RUN -eq 1 || $n -gt 0 ]] || return 0
+  log "    $n BGC regions collected"; echo "$n antiSMASH regions collected as input" >>"$STEP_LOG"
+  # no regions = antiSMASH not finished (or failed) yet: fail, so the step is not marked done and runs next time
+  [[ $DRY_RUN -eq 1 || $n -gt 0 ]] || { echo "no antiSMASH *.region*.gbk found in $RESULTS_DIR/*/08_antismash" >>"$STEP_LOG"; return 1; }
   local pfam
   pfam=$(find -L "$(antismash_db_path)" -name 'Pfam-A.hmm' 2>/dev/null | sort | tail -n 1)   # reuse antiSMASH's Pfam
   [[ -n "$pfam" || $DRY_RUN -eq 1 ]] || { log "    Pfam-A.hmm not found in $(antismash_db_path)"; return 1; }
@@ -1542,6 +1548,7 @@ case "$CMD" in
       Rscript -e "shiny::runApp('$PROJECT_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
   check-controls)
     python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" \
+      && python3 "$PROJECT_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" \
       && build_dashboard "$PROJECT_DIR/results_controls/_combined/summary" ;;   # adds the Controls page
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;
