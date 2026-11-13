@@ -33,7 +33,9 @@ iso1_0,"['g4', 'g5']",Polyketide,Yes,g1 g2,0 0,0.910
 iso1_1,"['g4', 'g5']",Polyketide,Yes,g1 g2,0 0,0.910
 iso1_2,,NonBGC,No,g6,0,0.000
 EOF
-printf 'Contig\tStart\tStop\tBest_Hit_ARO\tDrug Class\nctgA_5\t10500\t10800\ttestR\ttetracycline antibiotic\n' >"$R/10_rgi_card/iso1_rgi.txt"
+printf 'Contig\tStart\tStop\tBest_Hit_ARO\tDrug Class\tModel_type\nctgA_5\t10500\t10800\ttestR\ttetracycline antibiotic\tprotein homolog model\n' >"$R/10_rgi_card/iso1_rgi.txt"
+# a mutation (variant) model in a housekeeping gene inside the same locus: must be left out (intrinsic resistome)
+printf 'ctgA_6\t11000\t11500\tEF-Tu mutant\telfamycin antibiotic\tprotein variant model\n' >>"$R/10_rgi_card/iso1_rgi.txt"
 
 # reads (MinKNOW header), Flye contigs and the Bakta report: for the dashboard's sequencing/assembly pages
 mkdir -p "$R"/{01_nanoplot,03_flye}
@@ -75,7 +77,9 @@ r = rd("reads_sample.tsv")
 assert [(x["length"], x["meanQ"]) for x in r] == [("4", "20.0"), ("2", "10.0")], r        # '5' = Q20, '+' = Q10
 c = rd("contigs.tsv")
 assert [(x["contig"], x["length"], x["depth"], x["circular"]) for x in c] == [("ctgA", "12", "50", "yes"), ("ctgB", "4", "80", "no")], c
-assert rd("resistance_genes.tsv")[0]["gene"] == "testR"
+rg = rd("resistance_genes.tsv")
+assert [x["gene"] for x in rg] == ["testR"] and rg[0]["in_BGC_locus"] == top["locus_id"], rg     # EF-Tu variant left out
+assert gs["resistance_genes"] == gs["resistance_genes_in_BGCs"] == "1", gs
 print("summary self-check: all assertions passed")
 EOF
 # the shareable dashboard is built from the same tables and carries them as JSON

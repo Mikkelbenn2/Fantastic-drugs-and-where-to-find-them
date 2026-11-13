@@ -380,7 +380,7 @@ P.isolate = arg => {
          [fmt(g.completeness, 1) + " %", `complete, ${fmt(g.contamination, 2)} % contaminated`],
          [isReads(g) ? gb(g.raw_bases) + " Gb" : "genome", isReads(g) ? `reads, N50 ${fmt(sc(g.raw_read_N50, 1000), 1)} kb, Q${fmt(g.raw_meanQ, 1)}` : "published genome, no reads"],
          [L.length, "BGC loci"], [L.filter(r => r.novelty === "novel_candidate").length, `novel candidates (${L.filter(strong).length} with score ≥ 5)`],
-         [(D.resistance || []).filter(r => r.isolate === iso).length, "resistance genes"]]) +
+         [(D.resistance || []).filter(r => r.isolate === iso).length, `resistance genes (${na(g.resistance_genes_in_BGCs)} inside a BGC)`]]) +
   `<div class="grid three">` +
   card("Sample metadata", Object.keys(metaKv).length ? kv(metaKv) : '<p class="muted">No metadata. Add a row for this isolate to <code>metadata.tsv</code> in the project folder.</p>') +
   card("Sequencing run", kv({"barcode": esc(na(g.barcode)), "flow cell": esc(na(g.flow_cell_id)), "run id": esc(na(g.run_id)), "run start": esc(na(g.run_start)),
@@ -391,7 +391,7 @@ P.isolate = arg => {
        "CDS / tRNA / rRNA": `${fmt(g.CDS)} / ${fmt(g.tRNA)} / ${fmt(g.rRNA)}`, "BGCs per tool": `antiSMASH ${na(g.BGCs_antismash)}, GECCO ${na(g.BGCs_gecco)}, DeepBGC ${na(g.BGCs_deepbgc)}, BGC-Prophet ${na(g.BGCs_bgc_prophet)}`})) +
   `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div>', "wide") +
   `<div style="height:18px"></div>` + card("BGC loci of this isolate", '<div id="tiso"></div>', "wide") +
-  `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div>')}
+  `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div><p class="muted">Mutation and overexpression models (intrinsic resistome) are left out; see RGI_EXCLUDE_MODELS. A gene inside a BGC locus suggests self-resistance.</p>')}
    ${card("Read length and quality (first 5,000 reads)", '<div id="pl1" class="plot" style="height:250px"></div><div id="pq1" class="plot" style="height:250px"></div>')}</div>`;
 };
 P.isolate.after = arg => {
@@ -415,7 +415,8 @@ P.isolate.after = arg => {
   plot("pmap", tr, {barmode: "overlay", xaxis: {title: "position (Mb)", gridcolor: "#ecebe4"}, yaxis: {automargin: true, autorange: "reversed", type: "category"},
     margin: {l: 10, r: 16, t: 10, b: 50}, height: Math.max(220, 46 * names.length + 100)});
   table("tiso", L, bgcCols(false), {name: iso + "_loci"});
-  table("tres", res, [{l: "gene", k: "gene"}, {l: "drug class", k: "drug"}, {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1},
+  table("tres", res, [{l: "gene", k: "gene"}, {l: "drug class", k: "drug"}, {l: "mechanism", k: "mechanism"}, {l: "identity %", k: "identity", n: 1, d: 1},
+    {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1},
     {l: "in BGC locus", v: r => L.filter(x => x.contig === r.contig && num(x.start) <= num(r.end) && num(r.start) <= num(x.end)).map(x => x.locus_id).join(", ") || "no"}], {name: iso + "_resistance"});
   readHists("pl1", "pq1", [iso]);
 };

@@ -262,6 +262,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
 | `ANTIBIOTIC_TYPES`, `ML_ANTIBIOTIC_CLASSES` | see settings | Which BGC types can be novel antibiotic candidates |
 | `NON_ANTIBIOTIC_TYPES` | `NRP-metallophore NI-siderophore` | antiSMASH siderophore types: such loci are never antibiotic candidates |
+| `RGI_EXCLUDE_MODELS` | `variant overexpression knockout` | CARD model types left out of resistance counts and the score (mutations in housekeeping genes, regulators): the intrinsic resistome, not BGC self-resistance. Empty = keep all |
 | `SUPPORT_MIN_TOOLS` | 2 | Number of tools that must agree before a locus without antiSMASH counts as a candidate (1 = old behaviour) |
 | `GTDBTK_LOW_MEMORY`, `GTDBTK_PPLACER_CPUS` | 1, 1 | GTDB-Tk low-memory mode (slower, needs free disk). Set `GTDBTK_LOW_MEMORY=0` only with ≥ 150 GB RAM |
 | `SLURM_COMBINED_CPUS`, `SLURM_COMBINED_MEM` | 8, 64G | Resources of the combined job (GTDB-Tk, GToTree, BiG-SCAPE, summary) |
@@ -341,13 +342,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.8.2 (last updated 2026-11-13) |
+| **Version** | 3.8.3 (last updated 2026-11-13) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.3: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

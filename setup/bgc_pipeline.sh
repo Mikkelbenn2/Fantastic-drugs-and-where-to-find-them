@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.8.2
+#  Version       3.8.3
 #  Created       2026-10-06
 #  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.2 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.3 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.8.3  2026-11-13  RGI_EXCLUDE_MODELS: CARD mutation/overexpression/knockout models (intrinsic resistome)
+#                       no longer count; resistance_genes_in_BGCs per isolate; resistance_genes.tsv has in_BGC_locus.
 #    3.8.2  2026-11-13  check-controls also draws the report figures (setup/controls/plot_controls.R) with R from the
 #                       "dashboard" env, which now has r-ggplot2, r-forcats and r-patchwork.
 #                       A control run's summary step now also runs the control check + evaluation, so the
@@ -178,6 +180,10 @@ RUN_GECCO=1                    # machine-learning BGC detection  [S09]
 RUN_DEEPBGC=1                  # deep-learning BGC detection + product class/activity prediction  [S13]
 RUN_BGCPROPHET=1               # protein-language-model BGC detection + product class  [S14]
 RUN_RGI=1                     # resistance genes (CARD)  [S10]
+RGI_EXCLUDE_MODELS="variant overexpression knockout"   # CARD model types left out of counts and score:  [S10]
+                               # mutations in housekeeping genes (EF-Tu, gyrA, folP), regulators (marA, H-NS)
+                               # and knockouts are the intrinsic resistome, not self-resistance of a BGC.
+                               # Empty = keep all. RGI's full output stays in 10_rgi_card/.
 RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100 GB RAM  [C1]
 RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)  [C2]
 RUN_BIGSCAPE=1                 # BGC families compared with MIBiG  [C3]
@@ -253,7 +259,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.8.2"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.8.3"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -746,6 +752,7 @@ step_summary() {
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
     --abx-types "$ANTIBIOTIC_TYPES" --non-abx-types "$NON_ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" \
+    --rgi-exclude "$RGI_EXCLUDE_MODELS" \
     >>"$STEP_LOG" 2>&1 || return 1
   # the summary folder is rebuilt from scratch, so a control run re-does the control check + evaluation here
   if [[ "$(basename "$RESULTS_DIR")" == *results_controls ]]; then
@@ -1348,12 +1355,18 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
     return rows
 
 
-def rgi(sd, s):
+def rgi(sd, s, exclude=()):
+    """RGI hits; CARD model types containing a word of `exclude` (e.g. variant, overexpression) are left out"""
     out = []
     for r in read_tsv(os.path.join(sd, "10_rgi_card", f"{s}_rgi.txt")):
+        model = pick(r, "Model_type")
+        if any(w.lower() in model.lower() for w in exclude):
+            continue
         try:
             out.append({"contig": re.sub(r"_\d+$", "", pick(r, "Contig")), "start": int(pick(r, "Start")),
-                        "end": int(pick(r, "Stop")), "gene": pick(r, "Best_Hit_ARO"), "drug": pick(r, "Drug Class")})
+                        "end": int(pick(r, "Stop")), "gene": pick(r, "Best_Hit_ARO"), "drug": pick(r, "Drug Class"),
+                        "mechanism": pick(r, "Resistance Mechanism"), "model": model,
+                        "identity": pick(r, "Best_Identities"), "cut_off": pick(r, "Cut_Off")})
         except ValueError:
             pass
     return out
@@ -1408,6 +1421,7 @@ def main():
     ap.add_argument("--min-tools", type=int, default=2)
     ap.add_argument("--abx-types", default="NRPS T1PKS T2PKS T3PKS transAT-PKS")
     ap.add_argument("--non-abx-types", default="NRP-metallophore NI-siderophore")
+    ap.add_argument("--rgi-exclude", default="variant overexpression knockout")
     ap.add_argument("--ml-abx", default="Polyketide NRP RiPP")
     ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
@@ -1419,14 +1433,13 @@ def main():
 
     for s in [x for x in a.samples.split(",") if x]:
         sd = os.path.join(a.results, s)
-        regions, gec, res = antismash_regions(sd, s), gecco(sd), rgi(sd, s)
+        regions, gec, res = antismash_regions(sd, s), gecco(sd), rgi(sd, s, a.rgi_exclude.split())
         genes = bakta_genes(sd, s)
         dbg, pro = deepbgc(sd), bgc_prophet(sd, s, genes)
         g = genome_info(sd, s)
         ri, rd = run_info(sd, s)
         g.update(ri); g.update(taxa.get(s, {}))
         contigs += contig_rows(sd, s); reads += rd
-        resist += [{"isolate": s, **h} for h in res]
         g.update({"BGCs_antismash": len(regions), "BGCs_gecco": len(gec), "BGCs_deepbgc": len(dbg),
                   "BGCs_bgc_prophet": len(pro), "resistance_genes": len(res)})
         genomes.append(g)
@@ -1437,6 +1450,11 @@ def main():
                            set(a.abx_types.split()), set(a.ml_abx.split()), set(a.non_abx_types.split()))
         g["BGC_loci_all_tools"] = len(loci)
         calls += tc; master += loci
+        for h in res:     # which BGC locus a resistance gene sits in (self-resistance hint)
+            h["in_BGC_locus"] = ",".join(l["locus_id"] for l in loci if l["contig"] == h["contig"]
+                                         and overlap(h["start"], h["end"], l["start"], l["end"])) or "no"
+        g["resistance_genes_in_BGCs"] = sum(h["in_BGC_locus"] != "no" for h in res)
+        resist += [{"isolate": s, **h} for h in res]
 
         used = set()
         for r in regions:
