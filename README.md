@@ -2,7 +2,7 @@
 
 **From Oxford Nanopore reads of soil isolates to a ranked list of novel antimicrobial gene clusters.**
 
-`bgc_pipeline.sh` is a single bash script. It takes every isolate in `raw_data/` and does the following for each one:
+`bgc_pipeline.sh` is a single bash script. It takes every isolate in `1_raw_data/` and does the following for each one:
 
 1. Checks and filters the reads.
 2. Assembles the genome (no polishing: R10.4.1 reads basecalled with Dorado *sup* are accurate enough).
@@ -48,7 +48,7 @@ The **Tag** matches the box in the flowchart and the `[tag]` at the end of every
 
 ## Share the results: dashboard (one HTML file)
 
-The pipeline's last step also writes **`results/_combined/summary/dashboard.html`** (and `results_controls/…` for the controls). It is one file with all results inside: open it in any browser or e-mail it to your supervisor. Nothing runs on BioCloud while someone looks at it.
+The pipeline's last step also writes **`3_results/_combined/summary/dashboard.html`** (and `4_results_controls/…` for the controls). It is one file with all results inside: open it in any browser or e-mail it to your supervisor. Nothing runs on BioCloud while someone looks at it.
 
 | Page | Content |
 |---|---|
@@ -76,7 +76,7 @@ bash setup/bgc_pipeline.sh dashboard
 scp ml12pe@student.aau.dk@bio-fe01.srv.aau.dk:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results/_combined/summary/dashboard.html ~/Downloads/
 ```
 
-**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder. The first column is `isolate`, with the same names as in `raw_data/`; add any other columns (site, soil type, date, inhibition assay, Gram stain, kit, device …). Example: `dashboard/metadata_example.tsv`.
+**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder. The first column is `isolate`, with the same names as in `1_raw_data/`; add any other columns (site, soil type, date, inhibition assay, Gram stain, kit, device …). Example: `dashboard/metadata_example.tsv`.
 
 **Notes**
 - The charts use plotly.js. The builder puts it inside the file when it finds R's plotly package (e.g. the `dashboard` env made by `setup`), so the file also works offline. Otherwise the file loads plotly.js from the internet.
@@ -89,7 +89,7 @@ scp ml12pe@student.aau.dk@bio-fe01.srv.aau.dk:/projects/students/bio-26-BT-7-1/F
 ## Quick start
 
 ```bash
-# 1. Get the pipeline (the folders raw_data/, setup/ and results/ are already in the repository)
+# 1. Get the pipeline (the folders 1_raw_data/, setup/ and 3_results/ are already in the repository)
 git clone https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them.git
 cd Fantastic-drugs-and-where-to-find-them
 
@@ -97,8 +97,8 @@ cd Fantastic-drugs-and-where-to-find-them
 tmux new -s setup
 bash setup/bgc_pipeline.sh setup
 
-# 3. Put the reads in raw_data/ and check that they are found
-cp -r /path/to/reads/* raw_data/
+# 3. Put the reads in 1_raw_data/ and check that they are found
+cp -r /path/to/reads/* 1_raw_data/
 bash setup/bgc_pipeline.sh list
 
 # 4. Check the commands without running anything
@@ -115,10 +115,26 @@ You need `conda`, `mamba` or `micromamba` on your PATH (on many servers: `module
 
 ## Folder layout
 
+Numbered folders are the ones you open (data, results, dashboards). `setup/`, `controls/` and `dashboard/` hold the program code and keep their names, because the installed programs depend on them.
+
+| Folder | What is in it |
+|---|---|
+| `0_junk_yard/` | old and unused things (metagenome pipeline, old runs, old files); never used by the pipeline, delete when sure |
+| `1_raw_data/` | your reads or genomes, one per isolate |
+| `2_raw_data_controls/` | the control genomes and reads (downloaded by `controls`) |
+| `3_results/` | everything the pipeline makes for your isolates |
+| `4_results_controls/` | the same for the controls |
+| `5_dashboards/` | `dashboard_isolates.html` and `dashboard_controls.html`: open or share these |
+| `setup/` | the pipeline script, its programs (`envs/`) and databases |
+| `controls/` | control panel, expected BGCs, checker, evaluation, figures script |
+| `dashboard/` | the code that builds the dashboards |
+
+Older project folders (v3.7 and before: `raw_data/`, `results/` …): run `bash setup/tidy_project.sh` once to see the moves, then `bash setup/tidy_project.sh --do`. It only moves (never deletes) and refuses to run while pipeline jobs are running.
+
 ```
 Fantastic-drugs-and-where-to-find-them/
 ├── README.md
-├── raw_data/                  ← your reads
+├── 1_raw_data/                  ← your reads
 │   ├── isolate1.fastq.gz         one file per isolate, or
 │   └── barcode02/                one folder per isolate (many FASTQ files are joined)
 │   └── strainX.fna               or a finished genome (.fasta/.fna/.fa): no read QC or assembly
@@ -127,7 +143,7 @@ Fantastic-drugs-and-where-to-find-them/
 │   ├── envs/                     one conda environment per program (created by setup)
 │   ├── databases/                antiSMASH, Bakta, CheckM2, CARD, GTDB-Tk, DeepBGC, BGC-Prophet (created by setup)
 │   └── tests/test_summary.sh     self-check of the summary code (needs only python3)
-└── results/
+└── 3_results/
     ├── <isolate>/                one folder per isolate, one subfolder per program
     │   ├── 01_nanoplot/ … 10_rgi_card/
     │   ├── 11_gtdbtk/            this isolate's taxonomy
@@ -145,7 +161,7 @@ Fantastic-drugs-and-where-to-find-them/
     └── software_versions.tsv     exact version of every program (for your Methods)
 ```
 
-Isolate names come from the file or folder names in `raw_data/`. For example, `SRR24673188/` becomes the isolate `SRR24673188`.
+Isolate names come from the file or folder names in `1_raw_data/`. For example, `SRR24673188/` becomes the isolate `SRR24673188`.
 
 ---
 
@@ -224,7 +240,7 @@ One row per BGC as that tool predicted it, with the tool's own scores and the sa
 
 (`bgc_summary.tsv` keeps the old score, where "GECCO agrees" gives +1 instead of the tool and activity points.)
 
-The score is a triage aid. It tells you which clusters to open first in `results/<isolate>/08_antismash/index.html`. It does **not** prove that a compound is new or active.
+The score is a triage aid. It tells you which clusters to open first in `3_results/<isolate>/08_antismash/index.html`. It does **not** prove that a compound is new or active.
 
 ---
 
@@ -265,8 +281,8 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Continue after a crash or timeout | Run the same command again. Finished steps are skipped |
 | Redo one step | `bash setup/bgc_pipeline.sh run --force 08_antismash` |
 | Redo only the comparison steps | `bash setup/bgc_pipeline.sh combined` |
-| Follow Slurm jobs | `squeue --me` and `tail -f results/slurm_logs/*.out` |
-| Find out why a step failed | `tail -n 30 results/<isolate>/logs/<step>.log` |
+| Follow Slurm jobs | `squeue --me` and `tail -f 3_results/slurm_logs/*.out` |
+| Find out why a step failed | `tail -n 30 3_results/<isolate>/logs/<step>.log` |
 | Check the summary code after editing it | `bash setup/tests/test_summary.sh` |
 | Validate the pipeline on known genomes | `bash setup/bgc_pipeline.sh controls`, then `bash setup/bgc_pipeline.sh check-controls` (see `controls/README.md`) |
 
@@ -315,7 +331,7 @@ Cite each program by its paper:
 - **GToTree:** Lee (2019), *Bioinformatics* 35:4162–4164.
 - **BiG-SCAPE 2:** *bioRxiv* (2025) 10.1101/2025.08.20.671210.
 
-Check page numbers and DOIs against the original papers before they go into a report. The exact program versions used in each run are in `results/software_versions.tsv`.
+Check page numbers and DOIs against the original papers before they go into a report. The exact program versions used in each run are in `3_results/software_versions.tsv`.
 
 ---
 
@@ -325,13 +341,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.7.2 (last updated 2026-11-13) |
+| **Version** | 3.8.0 (last updated 2026-11-13) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.7.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

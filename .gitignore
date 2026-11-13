@@ -1,16 +1,17 @@
 # Data, results, programs and databases never go into git (large, and not always ours to share).
 # The empty folders are kept with .gitkeep files so the folder structure exists after cloning.
-raw_data/*
-!raw_data/.gitkeep
-results/*
-!results/.gitkeep
+1_raw_data/*
+!1_raw_data/.gitkeep
+3_results/*
+!3_results/.gitkeep
 setup/envs/
 setup/databases/
 setup/*.log
-raw_data_controls/
-results_controls/
+2_raw_data_controls/
+4_results_controls/
 controls_summary/
-junk_yard/
+0_junk_yard/
+5_dashboards/
 
 # OS clutter
 .DS_Store

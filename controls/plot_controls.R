@@ -3,7 +3,7 @@
 #   1) bash setup/bgc_pipeline.sh controls        (wait until the jobs are done)
 #   2) bash setup/bgc_pipeline.sh check-controls  (writes the controls_*.tsv tables)
 #   3) Rscript controls/plot_controls.R [SUMMARY_DIR] [OUT_DIR]
-# SUMMARY_DIR default: results_controls/_combined/summary   OUT_DIR default: SUMMARY_DIR/figures
+# SUMMARY_DIR default: 4_results_controls/_combined/summary   OUT_DIR default: SUMMARY_DIR/figures
 # In RStudio: set summ_dir / controls_dir below and press Source.
 # Output (PDF + PNG each):
 #   fig_controls_overview  A recovery of known BGCs, B loci per control by novelty, C priority scores
@@ -18,7 +18,7 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-summ_dir     <- if (length(args) >= 1) args[1] else "results_controls/_combined/summary"
+summ_dir     <- if (length(args) >= 1) args[1] else "4_results_controls/_combined/summary"
 out_dir      <- if (length(args) >= 2) args[2] else file.path(summ_dir, "figures")
 script       <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
 controls_dir <- if (length(script) == 1) dirname(script) else "controls"   # folder with control_panel.tsv

@@ -225,7 +225,7 @@ server <- function(input, output, session) {
   output$meta_note <- renderUI({
     if (!file.exists(file.path(project, "metadata.tsv")))
       p("Add your own sample information as ", code(file.path(project, "metadata.tsv")),
-        ": tab-separated, first column ", code("isolate"), " (same names as in raw_data/), any other columns ",
+        ": tab-separated, first column ", code("isolate"), " (same names as in 1_raw_data/), any other columns ",
         "(e.g. site, soil_type, date, inhibition_assay). It is then shown here, joined to every table, ",
         "and usable in 'Colour / filter by metadata'.")
   })
@@ -236,7 +236,7 @@ server <- function(input, output, session) {
   output$ctrl_note <- renderUI({
     if (is.null(data()$recovery))
       p("No control tables in this folder. Run ", code("bash setup/bgc_pipeline.sh check-controls"),
-        " and choose results_controls.")
+        " and choose 4_results_controls.")
   })
   output$recovery <- renderPlotly({
     r <- data()$recovery

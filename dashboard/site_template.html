@@ -473,7 +473,7 @@ P.metadata = () => {
   const cols = [...new Set(Object.values(META).flatMap(Object.keys))];
   return head("Metadata", "Sample metadata",
     `Everything known about each isolate besides the sequence: your own <code>metadata.tsv</code> in the project folder (tab-separated, first column
-     <code>isolate</code> with the same names as in <code>raw_data/</code>, any other columns) and, for the controls, <code>controls/control_panel.tsv</code>.
+     <code>isolate</code> with the same names as in <code>1_raw_data/</code>, any other columns) and, for the controls, <code>controls/control_panel.tsv</code>.
      Metadata columns with 2–12 different values can colour the charts (top right).`) +
   (cols.length ? "" : '<p class="muted">No metadata found for the isolates of this run.</p>') + card("", '<div id="tmeta"></div>', "wide");
 };

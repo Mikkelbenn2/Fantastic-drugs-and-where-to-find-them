@@ -41,7 +41,7 @@ Every accession, genome paper and paper showing (non-)production is in **`contro
 
 **Why genomes and not reads for most of them?**
 
-- A `.fna` file in `raw_data/` is used as a finished genome: the pipeline skips read QC and assembly and runs everything from QUAST onwards. The BGC part is then tested on exactly the published sequence.
+- A `.fna` file in `1_raw_data/` is used as a finished genome: the pipeline skips read QC and assembly and runs everything from QUAST onwards. The BGC part is then tested on exactly the published sequence.
 - In ENA (searched 2026-11-08), none of these strains has good R10.4.1 ONT reads. For example, the *S. venezuelae* ATCC 10712 run SRR33220699 has a median quality of about Q5. The other ONT runs are MinION runs of other strains or of mutants.
 - The read and assembly part is tested by the real *E. coli* K-12 run (median Q ≈ 23). Comparing it with `neg_Ecoli_K12_MG1655_ref` shows what assembly changes.
 
@@ -49,7 +49,7 @@ Every accession, genome paper and paper showing (non-)production is in **`contro
 
 ## How to run
 
-The controls run with the normal pipeline script, from the main project folder. They get their own input folder `raw_data_controls/` and output folder `results_controls/`, so they never mix with your isolates in `raw_data/` and `results/`. They use the same installed programs and databases.
+The controls run with the normal pipeline script, from the main project folder. They get their own input folder `2_raw_data_controls/` and output folder `4_results_controls/`, so they never mix with your isolates in `1_raw_data/` and `3_results/`. They use the same installed programs and databases.
 
 ```bash
 cd /projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them
@@ -59,7 +59,7 @@ bash setup/bgc_pipeline.sh controls               # downloads if missing, then s
 bash setup/bgc_pipeline.sh check-controls
 ```
 
-The checker writes three tables into `results_controls/_combined/summary/` and also prints them:
+The checker writes three tables into `4_results_controls/_combined/summary/` and also prints them:
 
 | File | What it shows |
 |---|---|
@@ -70,10 +70,10 @@ The checker writes three tables into `results_controls/_combined/summary/` and a
 **Figures for the report** (R with ggplot2, dplyr, tidyr, readr, forcats, patchwork), after `check-controls`:
 
 ```bash
-Rscript controls/plot_controls.R results_controls/_combined/summary
+Rscript controls/plot_controls.R 4_results_controls/_combined/summary
 ```
 
-PDF + PNG in `results_controls/_combined/summary/figures/`:
+PDF + PNG in `4_results_controls/_combined/summary/figures/`:
 
 | File | Content |
 |---|---|
@@ -83,7 +83,7 @@ PDF + PNG in `results_controls/_combined/summary/figures/`:
 
 On your own computer: copy the summary folder first (see "Explore the results on your own computer" in the main README), then `Rscript controls/plot_controls.R controls_summary`. In RStudio: open `controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
 
-If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `results_controls/slurm_logs/combined_*.out`.
+If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `4_results_controls/slurm_logs/combined_*.out`.
 
 ## Performance metrics: confusion matrix, sensitivity, specificity, ROC/AUC
 

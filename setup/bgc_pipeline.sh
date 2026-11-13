@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.7.2
+#  Version       3.8.0
 #  Created       2026-10-06
 #  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
@@ -18,12 +18,15 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.2 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.8.0  2026-11-13  Numbered folders: 1_raw_data, 2_raw_data_controls, 3_results, 4_results_controls,
+#                       5_dashboards (copies of every dashboard.html), 0_junk_yard (not used). Code folders
+#                       setup/, controls/, dashboard/ unchanged. setup/tidy_project.sh moves an older project.
 #    3.7.2  2026-11-13  BGC-Prophet: bgc-prophet 0.1.2's "pipeline" crashes at classification ("LMDB already open");
 #                       the step now runs "bgc_prophet classify" in its own process when that happens.
 #                       NON_ANTIBIOTIC_TYPES (NRP-metallophore, NI-siderophore): siderophore loci are never
@@ -176,7 +179,7 @@ RUN_BIGSCAPE=1                 # BGC families compared with MIBiG  [C3]
 
 GTDBTK_LOW_MEMORY=1            # 1 = GTDB-Tk's pplacer writes to disk (--scratch_dir) instead of RAM: slower,
                                # far less RAM (normal mode needs ~140 GB for bacteria, GTDB-Tk docs).
-                               # Needs free disk space in results/_combined/gtdbtk/ while it runs.  [C1]
+                               # Needs free disk space in 3_results/_combined/gtdbtk/ while it runs.  [C1]
 GTDBTK_PPLACER_CPUS=1          # pplacer RAM grows with its CPUs; 1 = least RAM (GTDB-Tk FAQ)  [C1]
 GTOTREE_HMM="Bacteria"         # marker set; "Actinobacteria" if all isolates are actinomycetes  [C2]
 
@@ -222,7 +225,7 @@ SLURM_ACCOUNT=""
 SLURM_SAMPLE_CPUS=16;  SLURM_SAMPLE_MEM="64G";   SLURM_SAMPLE_TIME="1-00:00:00"
 SLURM_COMBINED_CPUS=8;  SLURM_COMBINED_MEM="64G";  SLURM_COMBINED_TIME="1-00:00:00"
                                # combined = GTDB-Tk (low-memory mode), GToTree, BiG-SCAPE, summary.
-                               # GTDB-Tk killed for memory ("oom" in results/slurm_logs/combined_*.out)?
+                               # GTDB-Tk killed for memory ("oom" in 3_results/slurm_logs/combined_*.out)?
                                # -> raise SLURM_COMBINED_MEM; with GTDBTK_LOW_MEMORY=0 use >= "150G".
                                # RUN_GTDBTK=0 -> 4 CPUs / "16G" is enough.
 
@@ -245,7 +248,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.7.2"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.8.0"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -259,8 +262,8 @@ SETUP_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_DIR="$(dirname "$SETUP_DIR")"
 # Other input/output folders, e.g. for the controls (absolute paths):
 #   BGC_RAW_DIR=$PWD/raw_data_controls BGC_RESULTS_DIR=$PWD/results_controls bash setup/bgc_pipeline.sh submit
-RAW_DIR="${BGC_RAW_DIR:-$PROJECT_DIR/raw_data}"
-RESULTS_DIR="${BGC_RESULTS_DIR:-$PROJECT_DIR/results}"
+RAW_DIR="${BGC_RAW_DIR:-$PROJECT_DIR/1_raw_data}"
+RESULTS_DIR="${BGC_RESULTS_DIR:-$PROJECT_DIR/3_results}"
 ENV_DIR="$SETUP_DIR/envs"
 DB_DIR="$SETUP_DIR/databases"
 COMBINED_DIR="$RESULTS_DIR/_combined"
@@ -426,7 +429,7 @@ run_step() {
 # Each folder containing FASTQ files = one isolate (name = folder name)
 # Each FASTA file (.fasta/.fna/.fa, may be .gz) = a finished genome: no read QC or assembly
 find_samples() {
-  [[ -d "$RAW_DIR" ]] || die "No raw_data folder found at $RAW_DIR"
+  [[ -d "$RAW_DIR" ]] || die "No input folder found at $RAW_DIR"
   SAMPLES=(); SAMPLE_SRC=()
   local p name
   while IFS= read -r p; do
@@ -745,7 +748,12 @@ step_summary() {
 # Shareable dashboard: one HTML file with all summary tables inside (dashboard/build_site.py, python3 only)
 build_dashboard() {
   [[ -f "$PROJECT_DIR/dashboard/build_site.py" ]] || return 0
-  python3 "$PROJECT_DIR/dashboard/build_site.py" "$1" --project "$PROJECT_DIR" --pipeline-version "$PIPELINE_VERSION"
+  python3 "$PROJECT_DIR/dashboard/build_site.py" "$1" --project "$PROJECT_DIR" --pipeline-version "$PIPELINE_VERSION" || return 1
+  # a copy in 5_dashboards/ (easy to find): 3_results -> dashboard_isolates.html, 4_results_controls -> dashboard_controls.html
+  local name; name=$(basename "$(dirname "$(dirname "$1")")"); name=${name#[0-9]_}
+  case $name in results) name=isolates ;; results_*) name=${name#results_} ;; esac
+  mkdir -p "$PROJECT_DIR/5_dashboards" && cp "$1/dashboard.html" "$PROJECT_DIR/5_dashboards/dashboard_$name.html" \
+    && echo "Copy: $PROJECT_DIR/5_dashboards/dashboard_$name.html"
 }
 
 process_combined() {
@@ -1534,27 +1542,27 @@ case "$CMD" in
         found=1
         process_sample "${SAMPLES[$i]}" "${SAMPLE_SRC[$i]}" || FAILED+=("${SAMPLES[$i]}")
       done
-      [[ $found -eq 1 ]] || die "Isolate '$ONLY' not found in raw_data (see: list)"
+      [[ $found -eq 1 ]] || die "Isolate '$ONLY' not found in $RAW_DIR (see: list)"
     fi
     if [[ "$CMD" == combined || ( $DO_COMBINED -eq 1 && -z "$ONLY" ) ]]; then
       process_combined || FAILED+=("combined")
     fi
-    if [[ ${#FAILED[@]} -gt 0 ]]; then log "Finished with failures: ${FAILED[*]} (check results/<isolate>/logs/)"; exit 1; fi
+    if [[ ${#FAILED[@]} -gt 0 ]]; then log "Finished with failures: ${FAILED[*]} (check $RESULTS_DIR/<isolate>/logs/)"; exit 1; fi
     log "All done." ;;
   submit)
     find_samples; do_submit ;;
   controls)   # positive/negative controls: own input + output folders, same pipeline
-    CTRL_RAW="$PROJECT_DIR/raw_data_controls" CTRL_RES="$PROJECT_DIR/results_controls"
+    CTRL_RAW="$PROJECT_DIR/2_raw_data_controls" CTRL_RES="$PROJECT_DIR/4_results_controls"
     bash "$PROJECT_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
     next=submit; [[ $DRY_RUN -eq 1 ]] && next=run
     BGC_RAW_DIR="$CTRL_RAW" BGC_RESULTS_DIR="$CTRL_RES" exec bash "$SCRIPT_PATH" "$next" "${ARGS[@]}" ;;
   dashboard)   # rebuild the shareable dashboard.html of every results folder (fast, no Slurm needed)
     found=0
-    for d in "$PROJECT_DIR"/results*/_combined/summary; do
+    for d in "$PROJECT_DIR"/[0-9]_results*/_combined/summary; do
       [[ -f "$d/master_summary.tsv" ]] || continue
       build_dashboard "$d" && found=1
     done
-    [[ $found -eq 1 ]] || die "No finished results (results*/_combined/summary/master_summary.tsv) to build a dashboard from"
+    [[ $found -eq 1 ]] || die "No finished results ([0-9]_results*/_combined/summary/master_summary.tsv) to build a dashboard from"
     echo "Open it in a browser, or copy it to your computer and send it (see README: 'Share the results')." ;;
   dashboard-live)   # interactive Shiny app (dashboard/app.R) on a compute node; needs the "dashboard" env
     find_conda
@@ -1569,9 +1577,9 @@ case "$CMD" in
     BGC_PROJECT="$PROJECT_DIR" exec "$CONDA_RUN" run --no-capture-output -p "$ENV_DIR/dashboard" \
       Rscript -e "shiny::runApp('$PROJECT_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
   check-controls)
-    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" \
-      && python3 "$PROJECT_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/results_controls/_combined/summary" \
-      && build_dashboard "$PROJECT_DIR/results_controls/_combined/summary" ;;   # adds the Controls page
+    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
+      && python3 "$PROJECT_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
+      && build_dashboard "$PROJECT_DIR/4_results_controls/_combined/summary" ;;   # adds the Controls page
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;
 esac
