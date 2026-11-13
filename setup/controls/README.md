@@ -67,10 +67,12 @@ The checker writes three tables into `4_results_controls/_combined/summary/` and
 | `controls_expected_bgcs.tsv` | Every expected MIBiG BGC, and which tools found it |
 | `controls_loci.tsv` | Every control: loci, novelty labels, best score, and `PASS`/`CHECK`/`NOT_IN_RUN` |
 
-**Figures for the report** (R with ggplot2, dplyr, tidyr, readr, forcats, patchwork), after `check-controls`:
+**Figures for the report** (R with ggplot2, dplyr, tidyr, readr, forcats, patchwork).
+
+`check-controls` draws them for you, with the R of the `dashboard` environment (BioCloud's own R has no packages). To draw them again by hand:
 
 ```bash
-Rscript setup/controls/plot_controls.R 4_results_controls/_combined/summary
+conda run -p setup/envs/dashboard Rscript setup/controls/plot_controls.R 4_results_controls/_combined/summary
 ```
 
 PDF + PNG in `4_results_controls/_combined/summary/figures/`:

@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.8.1
+#  Version       3.8.2
 #  Created       2026-10-06
 #  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
@@ -18,12 +18,16 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.1 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.2 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.8.2  2026-11-13  check-controls also draws the report figures (setup/controls/plot_controls.R) with R from the
+#                       "dashboard" env, which now has r-ggplot2, r-forcats and r-patchwork.
+#                       A control run's summary step now also runs the control check + evaluation, so the
+#                       Controls page keeps its evaluation (the summary folder is rebuilt each run and lost it).
 #    3.8.1  2026-11-13  controls/ and dashboard/ moved into setup/ (all program code in one folder).
 #    3.8.0  2026-11-13  Numbered folders: 1_raw_data, 2_raw_data_controls, 3_results, 4_results_controls,
 #                       5_dashboards (copies of every dashboard.html), 0_junk_yard (not used). Code folders
@@ -245,11 +249,11 @@ declare -A ENV_PACKAGES=(
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
   [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"
-  [dashboard]="r-base>=4.3 libiconv r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr"   # only for "dashboard"
+  [dashboard]="r-base>=4.3 libiconv r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr r-ggplot2 r-forcats r-patchwork"   # dashboard-live + control figures
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.8.1"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.8.2"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -743,6 +747,12 @@ step_summary() {
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
     --abx-types "$ANTIBIOTIC_TYPES" --non-abx-types "$NON_ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" \
     >>"$STEP_LOG" 2>&1 || return 1
+  # the summary folder is rebuilt from scratch, so a control run re-does the control check + evaluation here
+  if [[ "$(basename "$RESULTS_DIR")" == *results_controls ]]; then
+    { python3 "$SETUP_DIR/controls/check_controls.py" "$COMBINED_DIR/summary" \
+        && python3 "$SETUP_DIR/controls/evaluate_controls.py" "$COMBINED_DIR/summary"; } >>"$STEP_LOG" 2>&1 \
+      || warn "control check/evaluation failed (see $STEP_LOG)"
+  fi
   build_dashboard "$COMBINED_DIR/summary" >>"$STEP_LOG" 2>&1 || warn "dashboard.html not built (see $STEP_LOG)"
 }
 
@@ -1580,7 +1590,13 @@ case "$CMD" in
   check-controls)
     python3 "$SETUP_DIR/controls/check_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
       && python3 "$SETUP_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
-      && build_dashboard "$PROJECT_DIR/4_results_controls/_combined/summary" ;;   # adds the Controls page
+      && build_dashboard "$PROJECT_DIR/4_results_controls/_combined/summary" || exit 1   # adds the Controls page
+    # report figures (R from the "dashboard" env; the server's own R has no packages)
+    find_conda
+    if [[ -d "$ENV_DIR/dashboard/conda-meta" ]]; then
+      "$CONDA_RUN" run -p "$ENV_DIR/dashboard" Rscript "$SETUP_DIR/controls/plot_controls.R" "$PROJECT_DIR/4_results_controls/_combined/summary" \
+        || echo "Figures failed. Missing R packages? Add them: $CONDA_RUN install -y -p $ENV_DIR/dashboard --override-channels -c conda-forge r-ggplot2 r-forcats r-patchwork" >&2
+    else echo "No figures: the dashboard env is missing (run: bash $SCRIPT_PATH setup)" >&2; fi ;;
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;
 esac
