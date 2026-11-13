@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.8.3
+#  Version       3.8.4
 #  Created       2026-10-06
 #  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.3 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.4 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.8.4  2026-11-13  setup/controls/make_expected_bgcs.py rebuilds the controls' truth set from MIBiG 4.0.1 (active
+#                       entries, strain TaxID); fuller MIBiG bioactivities -> 27 antimicrobial BGCs (grixazone A added).
 #    3.8.3  2026-11-13  RGI_EXCLUDE_MODELS: CARD mutation/overexpression/knockout models (intrinsic resistome)
 #                       no longer count; resistance_genes_in_BGCs per isolate; resistance_genes.tsv has in_BGC_locus.
 #    3.8.2  2026-11-13  check-controls also draws the report figures (setup/controls/plot_controls.R) with R from the
@@ -259,7 +261,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.8.3"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.8.4"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 

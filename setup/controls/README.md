@@ -45,7 +45,12 @@ Every accession, genome paper and paper showing (non-)production is in **`contro
 - In ENA (searched 2026-11-08), none of these strains has good R10.4.1 ONT reads. For example, the *S. venezuelae* ATCC 10712 run SRR33220699 has a median quality of about Q5. The other ONT runs are MinION runs of other strains or of mutants.
 - The read and assembly part is tested by the real *E. coli* K-12 run (median Q ≈ 23). Comparing it with `neg_Ecoli_K12_MG1655_ref` shows what assembly changes.
 
-**Expected BGCs.** `expected_bgcs.tsv` is taken directly from the MIBiG 4.0.1 JSON release (Zenodo record 14835872). It uses only `active` entries whose organism is exactly that strain.
+**Expected BGCs.** `expected_bgcs.tsv` is built by `setup/controls/make_expected_bgcs.py` from the MIBiG 4.0.1 JSON release (Zenodo record 14835872). It keeps only `active` entries whose source organism has the NCBI TaxID of exactly that strain (so other strains of the species and old species names don't count). Result: 58 BGCs, 57 of them for the positive controls (27 antimicrobial, 30 other), and enterobactin for *E. coli* K-12.
+
+```bash
+python3 setup/controls/make_expected_bgcs.py --check   # downloads MIBiG (~10 MB) and checks the file is unchanged
+python3 setup/controls/make_expected_bgcs.py           # rebuilds the file
+```
 
 ## How to run
 
