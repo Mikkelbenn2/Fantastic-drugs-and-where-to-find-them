@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
-<!-- Template for dashboard/build_site.py: the data token below is replaced by all result tables as JSON -->
+<!-- Template for setup/dashboard/build_site.py: the data token below is replaced by all result tables as JSON -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
 __PLOTLY__
@@ -429,7 +429,7 @@ P.controls = () => head("Controls", "Positive and negative controls",
    ${card("Detection of known BGCs per tool", '<div id="tdet"></div><p class="muted">Sensitivity = expected MIBiG BGCs found. Loci per Mb in the negative controls shows over-calling.</p>', "wide")}</div>
    <p class="muted">Truth: a locus matching an expected BGC that is a named antibiotic in the control paper or antibacterial/antifungal in MIBiG is positive;
    loci of negative controls and loci matching only non-antimicrobial BGCs are negative; other loci of producers are left out (truth unknown).
-   Score = priority score without novelty points ("blind score"). See controls/evaluate_controls.py.</p>` : "") +
+   Score = priority score without novelty points ("blind score"). See setup/controls/evaluate_controls.py.</p>` : "") +
   `<div class="grid">${card("Known BGCs found per positive control", '<div id="prec" class="plot"></div>')}
    ${card("Loci per control by novelty", '<div id="pcl" class="plot"></div>')}</div>` +
   card("Recovery of expected MIBiG BGCs", '<div id="trec"></div>', "wide") + '<div style="height:18px"></div>' +
@@ -473,7 +473,7 @@ P.metadata = () => {
   const cols = [...new Set(Object.values(META).flatMap(Object.keys))];
   return head("Metadata", "Sample metadata",
     `Everything known about each isolate besides the sequence: your own <code>metadata.tsv</code> in the project folder (tab-separated, first column
-     <code>isolate</code> with the same names as in <code>1_raw_data/</code>, any other columns) and, for the controls, <code>controls/control_panel.tsv</code>.
+     <code>isolate</code> with the same names as in <code>1_raw_data/</code>, any other columns) and, for the controls, <code>setup/controls/control_panel.tsv</code>.
      Metadata columns with 2–12 different values can colour the charts (top right).`) +
   (cols.length ? "" : '<p class="muted">No metadata found for the isolates of this run.</p>') + card("", '<div id="tmeta"></div>', "wide");
 };

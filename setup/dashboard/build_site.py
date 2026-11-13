@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the shareable results dashboard: ONE html file with all data inside, opened in any browser.
-   python3 dashboard/build_site.py RESULTS/_combined/summary [--out FILE] [--project DIR]
-Reads the summary tables of the pipeline (+ metadata.tsv, controls/control_panel.tsv, software_versions.tsv)
+   python3 setup/dashboard/build_site.py RESULTS/_combined/summary [--out FILE] [--project DIR]
+Reads the summary tables of the pipeline (+ metadata.tsv, setup/controls/control_panel.tsv, software_versions.tsv)
 and writes RESULTS/_combined/summary/dashboard.html. Needs only python3; nothing runs on the cluster
 afterwards: copy the file and send it. plotly.js (charts) is put inside the file when found (R's plotly
 package, e.g. setup/envs/dashboard), so it works offline; otherwise it is loaded from jsdelivr (needs internet)."""
@@ -12,7 +12,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument("summary")
 ap.add_argument("--out")
-ap.add_argument("--project", help="folder with metadata.tsv and controls/ (default: 3 levels above summary)")
+ap.add_argument("--project", help="folder with metadata.tsv (default: 3 levels above summary)")
 ap.add_argument("--title", default="BGC screening of soil isolates")
 ap.add_argument("--pipeline-version", default="")
 a = ap.parse_args()
@@ -35,7 +35,7 @@ genomes = rows(summ, "genome_summary.tsv")
 names = {g["isolate"] for g in genomes}
 # sample metadata: your metadata.tsv (first column = isolate) + the control panel, only isolates in this run
 meta = {}
-for src in (rows(project, "metadata.tsv"), rows(project, "controls", "control_panel.tsv")):
+for src in (rows(project, "metadata.tsv"), rows(here, "..", "controls", "control_panel.tsv")):
     for r in src:
         iso = r.get("isolate") or next(iter(r.values()), "")
         if iso in names:

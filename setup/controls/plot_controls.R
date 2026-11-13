@@ -2,7 +2,7 @@
 # Figures of the positive/negative control run, for the report.
 #   1) bash setup/bgc_pipeline.sh controls        (wait until the jobs are done)
 #   2) bash setup/bgc_pipeline.sh check-controls  (writes the controls_*.tsv tables)
-#   3) Rscript controls/plot_controls.R [SUMMARY_DIR] [OUT_DIR]
+#   3) Rscript setup/controls/plot_controls.R [SUMMARY_DIR] [OUT_DIR]
 # SUMMARY_DIR default: 4_results_controls/_combined/summary   OUT_DIR default: SUMMARY_DIR/figures
 # In RStudio: set summ_dir / controls_dir below and press Source.
 # Output (PDF + PNG each):
@@ -10,7 +10,7 @@
 #   fig_recovery           A alone (main text)
 #   fig_expected_bgcs      every expected MIBiG BGC and which tool found it (supplementary)
 #   fig_evaluation         A ROC curves + AUC, B confusion matrix, C sensitivity per tool
-#                          (only when controls/evaluate_controls.py has written the eval_*.tsv tables)
+#                          (only when setup/controls/evaluate_controls.py has written the eval_*.tsv tables)
 
 suppressPackageStartupMessages({
   library(readr); library(dplyr); library(tidyr); library(ggplot2)
@@ -21,7 +21,7 @@ args <- commandArgs(trailingOnly = TRUE)
 summ_dir     <- if (length(args) >= 1) args[1] else "4_results_controls/_combined/summary"
 out_dir      <- if (length(args) >= 2) args[2] else file.path(summ_dir, "figures")
 script       <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
-controls_dir <- if (length(script) == 1) dirname(script) else "controls"   # folder with control_panel.tsv
+controls_dir <- if (length(script) == 1) dirname(script) else "setup/controls"   # folder with control_panel.tsv
 
 need <- file.path(summ_dir, c("controls_expected_bgcs.tsv", "controls_loci.tsv", "master_summary.tsv"))
 if (!all(file.exists(need)))
@@ -171,7 +171,7 @@ save_both(overview & theme(legend.text = element_text(size = 8)), "fig_controls_
 save_both(p_recovery, "fig_recovery", 180, 110)
 save_both(p_per_bgc, "fig_expected_bgcs", 180, 40 + 4.2 * nrow(distinct(expected, mibig_accession)))
 
-# ---- evaluation: ROC, confusion matrix, sensitivity per tool (controls/evaluate_controls.py) ----
+# ---- evaluation: ROC, confusion matrix, sensitivity per tool (setup/controls/evaluate_controls.py) ----
 if (all(file.exists(file.path(summ_dir, c("eval_roc.tsv", "eval_auc.tsv", "eval_confusion.tsv", "eval_detection.tsv"))))) {
   rd <- function(f) read_tsv(file.path(summ_dir, f), show_col_types = FALSE, na = "NA")
   aucs <- rd("eval_auc.tsv") |> mutate(lab = sprintf("%s (AUC %.2f)", score, AUC))

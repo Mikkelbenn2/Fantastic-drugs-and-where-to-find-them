@@ -76,13 +76,13 @@ bash setup/bgc_pipeline.sh dashboard
 scp ml12pe@student.aau.dk@bio-fe01.srv.aau.dk:/projects/students/bio-26-BT-7-1/Fantastic-drugs-and-where-to-find-them/results/_combined/summary/dashboard.html ~/Downloads/
 ```
 
-**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder. The first column is `isolate`, with the same names as in `1_raw_data/`; add any other columns (site, soil type, date, inhibition assay, Gram stain, kit, device …). Example: `dashboard/metadata_example.tsv`.
+**Metadata** (optional): put a tab-separated `metadata.tsv` in the project folder. The first column is `isolate`, with the same names as in `1_raw_data/`; add any other columns (site, soil type, date, inhibition assay, Gram stain, kit, device …). Example: `setup/dashboard/metadata_example.tsv`.
 
 **Notes**
 - The charts use plotly.js. The builder puts it inside the file when it finds R's plotly package (e.g. the `dashboard` env made by `setup`), so the file also works offline. Otherwise the file loads plotly.js from the internet.
 - The run details come from the first read header. Reads downloaded from SRA/ENA have no such header, so those fields show "–".
-- Build without the pipeline: `python3 dashboard/build_site.py <summary folder> --project <project folder>` (python3 only).
-- The older interactive Shiny app still exists. It needs a running R session on a compute node: `bash setup/bgc_pipeline.sh dashboard-live` (see `dashboard/app.R`). Report figures of the controls: `Rscript controls/plot_controls.R <summary folder>`.
+- Build without the pipeline: `python3 setup/dashboard/build_site.py <summary folder> --project <project folder>` (python3 only).
+- The older interactive Shiny app still exists. It needs a running R session on a compute node: `bash setup/bgc_pipeline.sh dashboard-live` (see `setup/dashboard/app.R`). Report figures of the controls: `Rscript setup/controls/plot_controls.R <summary folder>`.
 
 ---
 
@@ -115,7 +115,7 @@ You need `conda`, `mamba` or `micromamba` on your PATH (on many servers: `module
 
 ## Folder layout
 
-Numbered folders are the ones you open (data, results, dashboards). `setup/`, `controls/` and `dashboard/` hold the program code and keep their names, because the installed programs depend on them.
+Numbered folders are the ones you open (data, results, dashboards). All program code is in `setup/`, which keeps its name because the installed programs in `setup/envs/` store their location.
 
 | Folder | What is in it |
 |---|---|
@@ -125,9 +125,9 @@ Numbered folders are the ones you open (data, results, dashboards). `setup/`, `c
 | `3_results/` | everything the pipeline makes for your isolates |
 | `4_results_controls/` | the same for the controls |
 | `5_dashboards/` | `dashboard_isolates.html` and `dashboard_controls.html`: open or share these |
-| `setup/` | the pipeline script, its programs (`envs/`) and databases |
-| `controls/` | control panel, expected BGCs, checker, evaluation, figures script |
-| `dashboard/` | the code that builds the dashboards |
+| `setup/` | all program code: the pipeline script, its programs (`envs/`) and databases |
+| `setup/controls/` | control panel, expected BGCs, checker, evaluation, figures script |
+| `setup/dashboard/` | the code that builds the dashboards |
 
 Older project folders (v3.7 and before: `raw_data/`, `results/` …): run `bash setup/tidy_project.sh` once to see the moves, then `bash setup/tidy_project.sh --do`. It only moves (never deletes) and refuses to run while pipeline jobs are running.
 
@@ -284,7 +284,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | Follow Slurm jobs | `squeue --me` and `tail -f 3_results/slurm_logs/*.out` |
 | Find out why a step failed | `tail -n 30 3_results/<isolate>/logs/<step>.log` |
 | Check the summary code after editing it | `bash setup/tests/test_summary.sh` |
-| Validate the pipeline on known genomes | `bash setup/bgc_pipeline.sh controls`, then `bash setup/bgc_pipeline.sh check-controls` (see `controls/README.md`) |
+| Validate the pipeline on known genomes | `bash setup/bgc_pipeline.sh controls`, then `bash setup/bgc_pipeline.sh check-controls` (see `setup/controls/README.md`) |
 
 ---
 
@@ -341,13 +341,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.8.0 (last updated 2026-11-13) |
+| **Version** | 3.8.1 (last updated 2026-11-13) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.1: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

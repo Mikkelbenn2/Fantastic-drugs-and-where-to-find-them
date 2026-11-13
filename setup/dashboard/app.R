@@ -4,12 +4,12 @@
 #   needs: install.packages(c("shiny", "DT", "plotly", "bslib", "readr", "dplyr", "tidyr"))
 # Data: every <folder>/_combined/summary with a master_summary.tsv inside the project folder, plus
 #   metadata.tsv            your own sample information (first column "isolate", any other columns)
-#   controls/control_panel.tsv  strain, accession and papers of the controls (added automatically)
+#   setup/controls/control_panel.tsv  strain, accession and papers of the controls (added automatically)
 
 library(shiny); library(bslib); library(plotly); library(DT)
 suppressPackageStartupMessages({library(readr); library(dplyr); library(tidyr)})
 
-project <- normalizePath(Sys.getenv("BGC_PROJECT", ".."), mustWork = FALSE)
+project <- normalizePath(Sys.getenv("BGC_PROJECT", "../.."), mustWork = FALSE)
 find_summaries <- function() {
   d <- c(Sys.getenv("BGC_SUMMARY"), Sys.glob(file.path(project, c("*/_combined/summary", "*summary"))))
   d <- unique(d[d != "" & file.exists(file.path(d, "master_summary.tsv"))])
@@ -36,7 +36,7 @@ loci_cols <- c("priority_score", "novelty", "isolate", "locus_id", "contig", "st
 # Sample metadata: your metadata.tsv + the control panel, one row per isolate
 read_metadata <- function() {
   own  <- read_tab(file.path(project, "metadata.tsv"))
-  ctrl <- read_tab(file.path(project, "controls", "control_panel.tsv"))
+  ctrl <- read_tab(file.path(project, "setup", "controls", "control_panel.tsv"))
   if (!is.null(ctrl)) ctrl <- select(ctrl, any_of(c("isolate", "control", "strain", "data_accession", "expected_antibiotics")))
   if (!is.null(own)) names(own)[1] <- "isolate"
   m <- bind_rows(own, ctrl)

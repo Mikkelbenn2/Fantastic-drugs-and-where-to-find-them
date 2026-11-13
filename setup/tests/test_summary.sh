@@ -79,7 +79,7 @@ assert rd("resistance_genes.tsv")[0]["gene"] == "testR"
 print("summary self-check: all assertions passed")
 EOF
 # the shareable dashboard is built from the same tables and carries them as JSON
-python3 "$HERE/../../dashboard/build_site.py" "$T/out" --project "$T" --out "$T/dash.html" >/dev/null
+python3 "$HERE/../dashboard/build_site.py" "$T/out" --project "$T" --out "$T/dash.html" >/dev/null
 python3 - "$T/dash.html" <<'EOF'
 import json, re, sys
 h = open(sys.argv[1]).read()

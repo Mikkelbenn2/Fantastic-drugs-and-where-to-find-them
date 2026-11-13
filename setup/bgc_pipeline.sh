@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.8.0
+#  Version       3.8.1
 #  Created       2026-10-06
 #  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
@@ -18,21 +18,22 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.1 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.8.1  2026-11-13  controls/ and dashboard/ moved into setup/ (all program code in one folder).
 #    3.8.0  2026-11-13  Numbered folders: 1_raw_data, 2_raw_data_controls, 3_results, 4_results_controls,
 #                       5_dashboards (copies of every dashboard.html), 0_junk_yard (not used). Code folders
-#                       setup/, controls/, dashboard/ unchanged. setup/tidy_project.sh moves an older project.
+#                       setup/, setup/controls/, setup/dashboard/ unchanged. setup/tidy_project.sh moves an older project.
 #    3.7.2  2026-11-13  BGC-Prophet: bgc-prophet 0.1.2's "pipeline" crashes at classification ("LMDB already open");
 #                       the step now runs "bgc_prophet classify" in its own process when that happens.
 #                       NON_ANTIBIOTIC_TYPES (NRP-metallophore, NI-siderophore): siderophore loci are never
 #                       antibiotic-relevant. Control evaluation flags only what the pipeline would make a strong
 #                       candidate (supported + antibiotic type + blind score >= 2).
-#    3.7.1  2026-11-11  check-controls also runs controls/evaluate_controls.py: confusion matrix, sensitivity,
+#    3.7.1  2026-11-11  check-controls also runs setup/controls/evaluate_controls.py: confusion matrix, sensitivity,
 #                       specificity, accuracy, F1, MCC, ROC/AUC (eval_*.tsv, dashboard Controls page,
 #                       fig_evaluation). expected_bgcs.tsv gets an "antimicrobial" truth column.
 #                       BiG-SCAPE with 0 antiSMASH regions now fails instead of being marked done (it was then
@@ -96,7 +97,7 @@
 #  Usage
 #    bash setup/bgc_pipeline.sh setup | list | run [--dry-run] | submit | help
 #    Controls:  bash setup/bgc_pipeline.sh controls [--dry-run]   then, when the jobs are done:
-#               bash setup/bgc_pipeline.sh check-controls          (see controls/README.md)
+#               bash setup/bgc_pipeline.sh check-controls          (see setup/controls/README.md)
 #    Dashboard: bash setup/bgc_pipeline.sh dashboard   (rebuilds results*/_combined/summary/dashboard.html:
 #               one file to open in any browser or send to others; no server)
 #    Other folders: BGC_RAW_DIR=/abs/raw BGC_RESULTS_DIR=/abs/results bash setup/bgc_pipeline.sh ...
@@ -248,7 +249,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.8.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.8.1"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -745,10 +746,10 @@ step_summary() {
   build_dashboard "$COMBINED_DIR/summary" >>"$STEP_LOG" 2>&1 || warn "dashboard.html not built (see $STEP_LOG)"
 }
 
-# Shareable dashboard: one HTML file with all summary tables inside (dashboard/build_site.py, python3 only)
+# Shareable dashboard: one HTML file with all summary tables inside (setup/dashboard/build_site.py, python3 only)
 build_dashboard() {
-  [[ -f "$PROJECT_DIR/dashboard/build_site.py" ]] || return 0
-  python3 "$PROJECT_DIR/dashboard/build_site.py" "$1" --project "$PROJECT_DIR" --pipeline-version "$PIPELINE_VERSION" || return 1
+  [[ -f "$SETUP_DIR/dashboard/build_site.py" ]] || return 0
+  python3 "$SETUP_DIR/dashboard/build_site.py" "$1" --project "$PROJECT_DIR" --pipeline-version "$PIPELINE_VERSION" || return 1
   # a copy in 5_dashboards/ (easy to find): 3_results -> dashboard_isolates.html, 4_results_controls -> dashboard_controls.html
   local name; name=$(basename "$(dirname "$(dirname "$1")")"); name=${name#[0-9]_}
   case $name in results) name=isolates ;; results_*) name=${name#results_} ;; esac
@@ -1553,7 +1554,7 @@ case "$CMD" in
     find_samples; do_submit ;;
   controls)   # positive/negative controls: own input + output folders, same pipeline
     CTRL_RAW="$PROJECT_DIR/2_raw_data_controls" CTRL_RES="$PROJECT_DIR/4_results_controls"
-    bash "$PROJECT_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
+    bash "$SETUP_DIR/controls/get_controls.sh" "$CTRL_RAW" || die "Downloading the controls failed (needs internet: run on the login node)"
     next=submit; [[ $DRY_RUN -eq 1 ]] && next=run
     BGC_RAW_DIR="$CTRL_RAW" BGC_RESULTS_DIR="$CTRL_RES" exec bash "$SCRIPT_PATH" "$next" "${ARGS[@]}" ;;
   dashboard)   # rebuild the shareable dashboard.html of every results folder (fast, no Slurm needed)
@@ -1564,7 +1565,7 @@ case "$CMD" in
     done
     [[ $found -eq 1 ]] || die "No finished results ([0-9]_results*/_combined/summary/master_summary.tsv) to build a dashboard from"
     echo "Open it in a browser, or copy it to your computer and send it (see README: 'Share the results')." ;;
-  dashboard-live)   # interactive Shiny app (dashboard/app.R) on a compute node; needs the "dashboard" env
+  dashboard-live)   # interactive Shiny app (setup/dashboard/app.R) on a compute node; needs the "dashboard" env
     find_conda
     [[ -d "$ENV_DIR/dashboard/conda-meta" ]] || die "Dashboard env missing — run: bash $SCRIPT_PATH setup"
     port=${DASHBOARD_PORT:-$(( 20000 + RANDOM % 20000 ))}
@@ -1575,10 +1576,10 @@ case "$CMD" in
     echo "Run it inside an interactive session (not on a login node). Stop with Ctrl+C."
     # 0.0.0.0: the BioCloud web proxy reaches the app from another machine
     BGC_PROJECT="$PROJECT_DIR" exec "$CONDA_RUN" run --no-capture-output -p "$ENV_DIR/dashboard" \
-      Rscript -e "shiny::runApp('$PROJECT_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
+      Rscript -e "shiny::runApp('$SETUP_DIR/dashboard', host = '0.0.0.0', port = $port, launch.browser = FALSE)" ;;
   check-controls)
-    python3 "$PROJECT_DIR/controls/check_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
-      && python3 "$PROJECT_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
+    python3 "$SETUP_DIR/controls/check_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
+      && python3 "$SETUP_DIR/controls/evaluate_controls.py" "$PROJECT_DIR/4_results_controls/_combined/summary" \
       && build_dashboard "$PROJECT_DIR/4_results_controls/_combined/summary" ;;   # adds the Controls page
   help|-h|--help) usage 0 ;;
   *) echo "Unknown command: $CMD" >&2; usage 1 ;;

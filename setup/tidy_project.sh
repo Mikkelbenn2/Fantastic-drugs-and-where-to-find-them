@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-off tidy-up of the BioCloud project folder for pipeline v3.8.0 (numbered folders).
+# One-off tidy-up of the BioCloud project folder for pipeline v3.8 (numbered folders, all code in setup/).
 #   bash setup/tidy_project.sh        shows what would be moved (changes nothing)
 #   bash setup/tidy_project.sh --do   moves it
 # Only MOVES (mv -n: never overwrites); nothing is deleted. Old and unused things go to 0_junk_yard/,
@@ -36,6 +36,9 @@ move "controls_summary.tar.gz"    "0_junk_yard/old_files/controls_summary.tar.gz
 move "gbk_to_table.py"            "0_junk_yard/old_files/gbk_to_table.py"
 move "setup/bgc_pipeline_v3.1.0_backup.sh" "0_junk_yard/old_files/bgc_pipeline_v3.1.0_backup.sh"
 move "Rplots.pdf"                 "0_junk_yard/old_files/Rplots.pdf"
+# v3.8.1: controls/ and dashboard/ live in setup/. Once the new copies are there, the old ones are not used.
+[[ -d setup/controls ]] && move "controls" "0_junk_yard/old_files/controls_before_v3.8.1"
+[[ -d setup/dashboard ]] && move "dashboard" "0_junk_yard/old_files/dashboard_before_v3.8.1"
 echo "== numbered data and result folders"
 move "raw_data"           "1_raw_data"
 move "raw_data_controls"  "2_raw_data_controls"

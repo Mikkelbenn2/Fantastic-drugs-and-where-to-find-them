@@ -70,7 +70,7 @@ The checker writes three tables into `4_results_controls/_combined/summary/` and
 **Figures for the report** (R with ggplot2, dplyr, tidyr, readr, forcats, patchwork), after `check-controls`:
 
 ```bash
-Rscript controls/plot_controls.R 4_results_controls/_combined/summary
+Rscript setup/controls/plot_controls.R 4_results_controls/_combined/summary
 ```
 
 PDF + PNG in `4_results_controls/_combined/summary/figures/`:
@@ -81,13 +81,13 @@ PDF + PNG in `4_results_controls/_combined/summary/figures/`:
 | `fig_recovery` | Panel A alone, for the main text |
 | `fig_expected_bgcs` | Every expected MIBiG BGC and which tool found it (supplementary) |
 
-On your own computer: copy the summary folder first (see "Explore the results on your own computer" in the main README), then `Rscript controls/plot_controls.R controls_summary`. In RStudio: open `controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
+On your own computer: copy the summary folder first (see "Explore the results on your own computer" in the main README), then `Rscript setup/controls/plot_controls.R controls_summary`. In RStudio: open `setup/controls/plot_controls.R`, set `summ_dir` and `controls_dir` at the top to your folders, and press Source.
 
 If it stops with "master_summary.tsv not found", the pipeline's last (combined) job has not finished or failed. Look in `4_results_controls/slurm_logs/combined_*.out`.
 
 ## Performance metrics: confusion matrix, sensitivity, specificity, ROC/AUC
 
-`check-controls` also runs `controls/evaluate_controls.py`. It writes `eval_*.tsv` next to the other tables, the dashboard's Controls page shows them, and `plot_controls.R` draws them as `fig_evaluation` (A: ROC curves, B: confusion matrix, C: sensitivity per tool). It answers two questions, each with its own truth:
+`check-controls` also runs `setup/controls/evaluate_controls.py`. It writes `eval_*.tsv` next to the other tables, the dashboard's Controls page shows them, and `plot_controls.R` draws them as `fig_evaluation` (A: ROC curves, B: confusion matrix, C: sensitivity per tool). It answers two questions, each with its own truth:
 
 | Question | Unit | Truth | Metrics |
 |---|---|---|---|

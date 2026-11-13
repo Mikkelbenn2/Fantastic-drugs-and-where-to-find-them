@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Scores a finished control run against controls/expected_bgcs.tsv and controls/control_panel.tsv.
-   python3 controls/check_controls.py RESULTS/_combined/summary [OUT_DIR]
+"""Scores a finished control run against setup/controls/expected_bgcs.tsv and setup/controls/control_panel.tsv.
+   python3 setup/controls/check_controls.py RESULTS/_combined/summary [OUT_DIR]
 Writes three tables to OUT_DIR (default: the summary folder) and prints them:
    controls_recovery.tsv       positives: per tool, how many of the strain's MIBiG BGCs were found
    controls_expected_bgcs.tsv  every expected MIBiG BGC and which tools found it

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Performance of the pipeline on the controls: confusion matrices, sensitivity, specificity, accuracy, ROC/AUC.
-   python3 controls/evaluate_controls.py RESULTS_CONTROLS/_combined/summary [OUT_DIR]
+   python3 setup/controls/evaluate_controls.py RESULTS_CONTROLS/_combined/summary [OUT_DIR]
 Run after the pipeline (and normally after check_controls.py). Needs only python3.
 
 Two questions, each with its own truth:
-1. DETECTION: are the characterised BGCs found?  Truth = controls/expected_bgcs.tsv (MIBiG BGCs of the strain).
+1. DETECTION: are the characterised BGCs found?  Truth = setup/controls/expected_bgcs.tsv (MIBiG BGCs of the strain).
    Unit = expected BGC. Found = among a predicted BGC's MIBiG matches with >= MIN_SIM % (same rule as
    check_controls.py). Gives sensitivity (recall) per tool. Over-calling is shown as loci per Mb in the negatives
    (their real BGCs, e.g. enterobactin, are unknown in number, so a true specificity cannot be computed here).
