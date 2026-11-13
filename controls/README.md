@@ -98,7 +98,7 @@ If it stops with "master_summary.tsv not found", the pipeline's last (combined) 
 How question 2 works:
 - **Truth column.** `antimicrobial` in `expected_bgcs.tsv` is `yes` when the compound is a named antibiotic in the control's paper (`control_panel.tsv`) or MIBiG lists it as antibacterial/antifungal. Five borderline BGCs were checked in the literature and set by hand: toxoflavin and coelimycin are `yes`; erythrochelin, the SGR PTMs and the bacillothiazols are `no`. The column `antimicrobial_evidence` gives the source, with a DOI for the hand-set ones.
 - **Score.** In the controls every BGC is known, so the priority score would always give it 0 novelty points. The evaluation therefore uses the **novelty-blind score**: the priority score without the novelty points. It asks: "would the evidence (type, tool agreement, resistance gene, DeepBGC activity) have ranked this BGC high if it were new?"
-- **Flagged** means a blind score ≥ 2. A new locus with that blind score reaches the "strong candidate" level, a priority score ≥ 5.
+- **Flagged** uses the pipeline's own rule for a strong candidate, minus the novelty part. The locus must be supported (antiSMASH, or ≥ 2 tools), be of an antibiotic-relevant type (siderophores excluded), and have a blind score ≥ 2, so that a new locus would reach priority score ≥ 5. Results made before v3.6.0 have no `antibiotic_type` column; for those, only the blind score is used.
 - **Left out.** Loci of producers that match no expected BGC are left out. They may be real, uncharacterised clusters, so their truth is unknown.
 - **Misses.** Antimicrobial BGCs that no tool found count as false negatives.
 

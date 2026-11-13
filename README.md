@@ -209,7 +209,7 @@ One row per BGC as that tool predicted it, with the tool's own scores and the sa
 | < 30 % or no hit, other type (terpene, siderophore, ectoine, melanin, low-confidence "-like" rules…) | `novel_other`: shown, but no novelty or type points |
 | < 30 % or no hit, found by one machine-learning tool only | `low_support`: shown, but no points (in the negative controls these single-tool calls were the false "novel" hits) |
 
-"Antibiotic-relevant type" is decided by antiSMASH's rule-based region type when antiSMASH found the locus (list: `ANTIBIOTIC_TYPES` in the settings: NRPS, PKS types, RiPP subtypes such as lanthipeptides and thiopeptides, aminoglycosides, β-lactams, nucleosides, phosphonates, phenazines…). For loci found only by machine-learning tools, at least two must agree and their class must be Polyketide, NRP or RiPP (`ML_ANTIBIOTIC_CLASSES`). This lets agreeing ML tools find non-canonical clusters that antiSMASH's rules miss. Column `antibiotic_type` shows the decision.
+"Antibiotic-relevant type" is decided by antiSMASH's rule-based region type when antiSMASH found the locus (list: `ANTIBIOTIC_TYPES` in the settings: NRPS, PKS types, RiPP subtypes such as lanthipeptides and thiopeptides, aminoglycosides, β-lactams, nucleosides, phosphonates, phenazines…). A locus that antiSMASH tags as a siderophore (`NON_ANTIBIOTIC_TYPES`: `NRP-metallophore`, `NI-siderophore`) is never antibiotic-relevant, even when it is built by an NRPS (enterobactin, coelichelin, pyoverdine). For loci found only by machine-learning tools, at least two must agree and their class must be Polyketide, NRP or RiPP (`ML_ANTIBIOTIC_CLASSES`). This lets agreeing ML tools find non-canonical clusters that antiSMASH's rules miss. Column `antibiotic_type` shows the decision.
 
 **Priority score** in `master_summary.tsv`:
 
@@ -245,6 +245,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `BGCPROPHET_MAX_GAP`, `BGCPROPHET_MIN_COUNT` | 3, 2 | BGC-Prophet cluster joining (README values) |
 | `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
 | `ANTIBIOTIC_TYPES`, `ML_ANTIBIOTIC_CLASSES` | see settings | Which BGC types can be novel antibiotic candidates |
+| `NON_ANTIBIOTIC_TYPES` | `NRP-metallophore NI-siderophore` | antiSMASH siderophore types: such loci are never antibiotic candidates |
 | `SUPPORT_MIN_TOOLS` | 2 | Number of tools that must agree before a locus without antiSMASH counts as a candidate (1 = old behaviour) |
 | `GTDBTK_LOW_MEMORY`, `GTDBTK_PPLACER_CPUS` | 1, 1 | GTDB-Tk low-memory mode (slower, needs free disk). Set `GTDBTK_LOW_MEMORY=0` only with ≥ 150 GB RAM |
 | `SLURM_COMBINED_CPUS`, `SLURM_COMBINED_MEM` | 8, 64G | Resources of the combined job (GTDB-Tk, GToTree, BiG-SCAPE, summary) |
@@ -324,13 +325,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.7.1 (last updated 2026-11-11) |
+| **Version** | 3.7.2 (last updated 2026-11-13) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.7.1: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.7.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).

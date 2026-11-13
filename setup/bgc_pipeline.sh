@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.7.1
+#  Version       3.7.2
 #  Created       2026-10-06
-#  Last updated  2026-11-11
+#  Last updated  2026-11-13
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -18,12 +18,17 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.1 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.7.2 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.7.2  2026-11-13  BGC-Prophet: bgc-prophet 0.1.2's "pipeline" crashes at classification ("LMDB already open");
+#                       the step now runs "bgc_prophet classify" in its own process when that happens.
+#                       NON_ANTIBIOTIC_TYPES (NRP-metallophore, NI-siderophore): siderophore loci are never
+#                       antibiotic-relevant. Control evaluation flags only what the pipeline would make a strong
+#                       candidate (supported + antibiotic type + blind score >= 2).
 #    3.7.1  2026-11-11  check-controls also runs controls/evaluate_controls.py: confusion matrix, sensitivity,
 #                       specificity, accuracy, F1, MCC, ROC/AUC (eval_*.tsv, dashboard Controls page,
 #                       fig_evaluation). expected_bgcs.tsv gets an "antimicrobial" truth column.
@@ -204,6 +209,9 @@ ANTIBIOTIC_TYPES="NRPS T1PKS T2PKS T3PKS transAT-PKS prodigiosin lanthipeptide-c
   linaridin lipolanthine ranthipeptide glycocin bottromycin cyanobactin microviridin proteusin thioamitides
   epipeptide guanidinotides azole-containing-RiPP aminocoumarin aminoglycoside amglyccycl blactam betalactone
   nucleoside phosphonate phenazine tropodithietic-acid pyrrolidine furan isocyanide NAPAA oligosaccharide CDPS"
+#   antiSMASH types that mark a SIDEROPHORE: a locus with one of these is never antibiotic-relevant, even when it
+#   also has NRPS/PKS (antiSMASH tags NRPS siderophores such as enterobactin, coelichelin as NRP-metallophore)
+NON_ANTIBIOTIC_TYPES="NRP-metallophore NI-siderophore"   # [C4]
 #   GECCO / DeepBGC / BGC-Prophet classes (used for loci found by >= 2 ML tools without antiSMASH):
 ML_ANTIBIOTIC_CLASSES="Polyketide NRP RiPP"
 RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4]
@@ -237,7 +245,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.7.1"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.7.2"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -593,7 +601,17 @@ step_bgcprophet() {
     --modelPath "${m:-models}/annotator.pt" --classifierPath "${m:-models}/classifier.pt" \
     --threshold "$BGCPROPHET_THRESHOLD" --max_gap "$BGCPROPHET_MAX_GAP" --min_count "$BGCPROPHET_MIN_COUNT" \
     --classify_t "$BGCPROPHET_CLASSIFY_T" \
-    --device "$BGCPROPHET_DEVICE" --threads "$THREADS" || return 1
+    --device "$BGCPROPHET_DEVICE" --threads "$THREADS" \
+    || log "    BGC-Prophet pipeline stopped; running its classify step on its own"
+  # bgc-prophet 0.1.2 bug: "pipeline" opens the same LMDB twice in one process ("already open"), so it
+  # crashes after writing $S.csv (annotation) and before classification. Classify in a fresh process.
+  if [[ $DRY_RUN -eq 0 && ! -s "$out/${S}_classified.csv" ]]; then
+    need "$out/$S.csv" || return 1
+    run_in_env bgcprophet bash -c 'export TORCH_HOME="$1"; cd "$2" && shift 2 && bgc_prophet "$@"' _ \
+      "$BGCPROPHET_DB/torch" "$out" classify --datasetPath "$out/$S.csv" --lmdbPath "$out/lmdb_$S" \
+      --classifierPath "${m:-models}/classifier.pt" --outputPath "$out" --name "$S" \
+      --classify_t "$BGCPROPHET_CLASSIFY_T" --device "$BGCPROPHET_DEVICE" || return 1
+  fi
   need "$out/${S}_classified.csv"
 }
 
@@ -719,7 +737,8 @@ step_summary() {
   python3 "$CL/summary.py" --results "$RESULTS_DIR" --samples "$names" \
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
-    --abx-types "$ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" >>"$STEP_LOG" 2>&1 || return 1
+    --abx-types "$ANTIBIOTIC_TYPES" --non-abx-types "$NON_ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" \
+    >>"$STEP_LOG" 2>&1 || return 1
   build_dashboard "$COMBINED_DIR/summary" >>"$STEP_LOG" 2>&1 || warn "dashboard.html not built (see $STEP_LOG)"
 }
 
@@ -1249,7 +1268,8 @@ def tool_calls(s, regions, gec, dbg, pro, genes, hits, refs, mibig_ran):
 
 
 def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tools=2,
-                abx_types=frozenset({"NRPS", "T1PKS"}), ml_abx=frozenset({"Polyketide", "NRP", "RiPP"})):
+                abx_types=frozenset({"NRPS", "T1PKS"}), ml_abx=frozenset({"Polyketide", "NRP", "RiPP"}),
+                non_abx=frozenset({"NRP-metallophore", "NI-siderophore"})):
     """merge overlapping predictions of all tools into loci, score and describe each locus"""
     rows = []
     for n, L in enumerate(merge_loci(calls), start=1):
@@ -1274,7 +1294,8 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
         supported = "antismash" in tools or len(tools) >= min_tools
         # antibiotic-relevant type: antiSMASH's rule-based type when antiSMASH found it, else the ML classes  [C4]
         if "antismash" in tools:
-            abx = bool(set(re.split(r"[+;]", vals("antismash_type"))) & abx_types)
+            types = set(re.split(r"[+;]", vals("antismash_type")))
+            abx = bool(types & abx_types) and not types & non_abx       # siderophore NRPS are not antibiotics
         else:
             abx = bool(set(re.split(r"[+;,\s-]+", " ".join(vals(k) for k in
                        ("gecco_type", "deepbgc_class", "bgc_prophet_class")))) & ml_abx)
@@ -1367,6 +1388,7 @@ def main():
     ap.add_argument("--known", type=float, default=80); ap.add_argument("--related", type=float, default=30)
     ap.add_argument("--min-tools", type=int, default=2)
     ap.add_argument("--abx-types", default="NRPS T1PKS T2PKS T3PKS transAT-PKS")
+    ap.add_argument("--non-abx-types", default="NRP-metallophore NI-siderophore")
     ap.add_argument("--ml-abx", default="Polyketide NRP RiPP")
     ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
@@ -1393,7 +1415,7 @@ def main():
         mibig_ran = os.path.isfile(os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv"))
         tc = tool_calls(s, regions, gec, dbg, pro, genes, mibig_hits(sd, s), refs, mibig_ran)
         loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools,
-                           set(a.abx_types.split()), set(a.ml_abx.split()))
+                           set(a.abx_types.split()), set(a.ml_abx.split()), set(a.non_abx_types.split()))
         g["BGC_loci_all_tools"] = len(loci)
         calls += tc; master += loci
 

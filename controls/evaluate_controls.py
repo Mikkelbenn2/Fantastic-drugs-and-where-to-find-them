@@ -16,7 +16,10 @@ Two questions, each with its own truth:
    as positives with the lowest score (false negatives).
    Score = "novelty-blind" priority score = priority_score minus the novelty points (novel_candidate 3, related 1):
    in the controls everything is known, so this asks "would the evidence have ranked it high if it were new?".
-   Predicted positive = blind score >= BLIND_CUTOFF (2: a novel candidate needs 3 + 2 = score 5 to be "strong").
+   Predicted positive = the pipeline's own rule for a strong novel candidate, without the novelty part:
+   supported (antiSMASH, or >= 2 tools) AND antibiotic-relevant type AND blind score >= BLIND_CUTOFF
+   (2: a novel candidate needs 3 + 2 = score 5 to be "strong"). Older results without the column
+   antibiotic_type fall back to the blind score alone.
 3. GENOME LEVEL: positive vs negative strains; predicted producer = >= 1 novel_candidate with score >= 5
    (the pipeline's own output). Only 12 genomes, so read it as a sanity check.
 Writes eval_confusion.tsv, eval_metrics.tsv, eval_auc.tsv, eval_roc.tsv, eval_detection.tsv, eval_loci_truth.tsv."""
@@ -29,6 +32,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 TOOLS = ["antismash", "gecco", "deepbgc", "bgc_prophet"]
 MIN_SIM = 30          # same as check_controls.py
 BLIND_CUTOFF = 2      # novelty-blind score at which a NEW locus would reach priority score 5
+MIN_TOOLS = 2         # the pipeline's SUPPORT_MIN_TOOLS (read from settings.tsv when present)
 NOVELTY_PTS = {"novel_candidate": 3, "related": 1}
 
 
@@ -103,6 +107,7 @@ def write(name, header, table):
 
 
 master = rows(summ, "master_summary.tsv")
+MIN_TOOLS = int(next((r["value"] for r in rows(summ, "settings.tsv") if r["setting"] == "min_tools"), MIN_TOOLS))
 if not master:
     sys.exit(f"ERROR: no master_summary.tsv in {summ}")
 os.makedirs(out_dir, exist_ok=True)
@@ -163,6 +168,7 @@ for r in master:
     truth.append({"isolate": iso, "locus_id": r["locus_id"], "truth": label, "matched_expected": ",".join(sorted(hits)) or "-",
                   "novelty": r["novelty"], "priority_score": r["priority_score"], "blind_score": blind,
                   "n_tools": num(r.get("n_tools"), 1), "antibiotic_type": 1 if r.get("antibiotic_type") == "yes" else 0,
+                  "supported": "antismash" in r.get("tools", "") or num(r.get("n_tools"), 1) >= MIN_TOOLS,
                   "deepbgc_activity": num(r.get("deepbgc_max_antibacterial_or_antifungal"), 0)})
 n_cryptic = sum(1 for r in master if panel.get(r["isolate"]) == "positive" and not locus_hits.get(r["locus_id"]))
 for iso, exp in expected.items():                 # antimicrobial BGCs no tool found = false negatives
@@ -171,10 +177,11 @@ for iso, exp in expected.items():                 # antimicrobial BGCs no tool f
             if amr and a not in matched[iso]:
                 truth.append({"isolate": iso, "locus_id": "missed:" + a, "truth": "positive", "matched_expected": a,
                               "novelty": "not_detected", "priority_score": "NA", "blind_score": -99,
-                              "n_tools": 0, "antibiotic_type": 0, "deepbgc_activity": 0})
+                              "n_tools": 0, "antibiotic_type": 0, "supported": False, "deepbgc_activity": 0})
 P = [x for x in truth if x["truth"] == "positive"]
 N = [x for x in truth if x["truth"] == "negative"]
-pred = lambda x: x["blind_score"] >= BLIND_CUTOFF
+has_type = any("antibiotic_type" in r for r in master)
+pred = lambda x: x["blind_score"] >= BLIND_CUTOFF and (not has_type or (x["supported"] and x["antibiotic_type"]))
 tp, fn = sum(map(pred, P)), sum(not pred(x) for x in P)
 fp, tn = sum(map(pred, N)), sum(not pred(x) for x in N)
 
@@ -184,7 +191,8 @@ gp = [i for i in in_run if panel.get(i) == "positive"]
 gn = [i for i in in_run if panel.get(i) == "negative"]
 g = (sum(map(strong, gp)), sum(map(strong, gn)), sum(not strong(i) for i in gp), sum(not strong(i) for i in gn))
 
-confusion = [["locus: antibiotic BGC (blind score >= %d)" % BLIND_CUTOFF, tp, fp, fn, tn, n_cryptic],
+confusion = [["locus: antibiotic BGC (supported, antibiotic type, blind score >= %d)" % BLIND_CUTOFF if has_type
+              else "locus: antibiotic BGC (blind score >= %d)" % BLIND_CUTOFF, tp, fp, fn, tn, n_cryptic],
              ["genome: producer (>= 1 novel candidate, score >= 5)", g[0], g[1], g[2], g[3], 0]]
 met = []
 for name, c in (("locus", (tp, fp, fn, tn)), ("genome", g)):
@@ -215,7 +223,7 @@ for d in det:
     print(f"  {d[0]:12s} {d[2]}/{d[1]}  sensitivity {d[3] or 0:.2f} (95 % CI {d[4] or 0:.2f}-{d[5] or 0:.2f})  "
           f"loci/Mb in negatives {d[7] if d[7] is None else round(d[7], 2)}")
 print(f"== Antibiotic ranking: {len(P)} positive, {len(N)} negative loci ({n_cryptic} cryptic loci left out)")
-print(f"  confusion at blind score >= {BLIND_CUTOFF}: TP {tp}  FP {fp}  FN {fn}  TN {tn}")
+print(f"  confusion ({confusion[0][0]}): TP {tp}  FP {fp}  FN {fn}  TN {tn}")
 for m in met:
     if m[0] == "locus" and m[2] is not None:
         print(f"  {m[1]:28s} {m[2]:.2f}" + (f" (95 % CI {m[3]:.2f}-{m[4]:.2f})" if m[3] is not None else ""))

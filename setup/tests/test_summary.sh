@@ -19,7 +19,8 @@ printf '%s\t%s\t%s\t300\t330\t330\t1e-50\t500\n' g1 'BGC0000001|c1|1-10|+|P1|x|P
 cat >"$R/08_antismash/iso1.json" <<'EOF'
 {"records": [{"id": "ctgA", "areas": [{"start": 899, "end": 4100, "products": ["NRPS"], "protoclusters": {"1": {"category": "NRPS"}}}],
   "modules": {"antismash.modules.clusterblast": {"knowncluster": {"results": [{"region_number": 1,
-  "ranking": [[{"accession": "BGC0000001", "description": "testomycin"}, {"similarity": 100}]]}]}}}}]}
+  "ranking": [[{"accession": "BGC0000001", "description": "testomycin"}, {"similarity": 100}]]}]}}}},
+ {"id": "ctgC", "areas": [{"start": 0, "end": 5000, "products": ["NRP-metallophore", "NRPS"], "protoclusters": {"1": {"category": "NRPS"}}}]}]}
 EOF
 printf 'sequence_id\tcluster_id\tstart\tend\taverage_p\tmax_p\ttype\nctgA\tctgA_cluster_1\t950\t3900\t0.9\t0.99\tNRP\n' >"$R/09_gecco/iso1.clusters.tsv"
 printf 'sequence_id\tbgc_candidate_id\tnucl_start\tnucl_end\tdeepbgc_score\tproduct_class\tproduct_activity\tantibacterial\tantifungal\tcytotoxic\tinhibitor\n' >"$R/13_deepbgc/13_deepbgc.bgc.tsv"
@@ -46,14 +47,17 @@ import csv, os, sys
 d = sys.argv[1]
 rd = lambda p: list(csv.DictReader(open(os.path.join(d, p)), delimiter="\t"))
 m = rd("master_summary.tsv")
-assert len(m) == 3, m
-top, known, lone = m
+assert len(m) == 4, m
+top, known, lone, sidero = m
 assert (top["tools"], top["novelty"], top["priority_score"]) == ("deepbgc;bgc_prophet", "novel_candidate", "9"), top
 assert (top["closest_MIBiG"], top["MIBiG_similarity_pct"]) == ("BGC0000002", "25"), top        # 1 of 4 genes
 assert top["resistance_gene_in_locus"].startswith("testR") and top["completeness"] == "NA"
 assert (known["tools"], known["novelty"], known["priority_score"]) == ("antismash;gecco", "known", "3"), known
 assert (lone["tools"], lone["novelty"], lone["priority_score"]) == ("deepbgc", "low_support", "1"), lone
 assert (top["antibiotic_type"], known["antibiotic_type"]) == ("yes", "yes")       # ML Polyketide / antiSMASH NRPS
+# NRPS siderophore (antiSMASH NRP-metallophore): never antibiotic-relevant -> novel_other, no +2
+assert (sidero["antismash_type"], sidero["antibiotic_type"], sidero["novelty"], sidero["priority_score"]) == \
+    ("NRP-metallophore+NRPS", "no", "novel_other", "0"), sidero
 assert known["MIBiG_from"].startswith("antismash (antiSMASH KnownClusterBlast)"), known
 p = rd("per_tool/bgc_prophet_bgcs.tsv")
 assert len(p) == 1 and (p[0]["start"], p[0]["end"]) == ("10000", "12000"), p                 # duplicate window removed
@@ -63,7 +67,7 @@ assert g["MIBiG_all_hits"] == "BGC0000001:100", g
 assert rd("per_tool/antismash_bgcs.tsv")[0]["MIBiG_all_hits"] == "BGC0000001:100"
 assert rd("per_tool/deepbgc_bgcs.tsv")[0]["start"] == "9900"                                  # 0-based -> 1-based
 gs = rd("genome_summary.tsv")[0]
-assert gs["BGC_loci_all_tools"] == "3"
+assert gs["BGC_loci_all_tools"] == "4"
 assert (gs["basecall_model"], gs["flow_cell_id"], gs["run_id"], gs["barcode"]) == \
     ("dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "PAW12345", "abc123def456", "barcode07"), gs
 assert (gs["bakta_db"], gs["CDS"], gs["tRNA"]) == ("v6.0, full", "6", "2"), gs
@@ -80,7 +84,7 @@ python3 - "$T/dash.html" <<'EOF'
 import json, re, sys
 h = open(sys.argv[1]).read()
 d = json.loads(re.search(r'<script id="data" type="application/json">(.*?)</script>', h, re.S).group(1))
-assert len(d["master"]) == 3 and d["genomes"][0]["flow_cell_id"] == "PAW12345" and len(d["reads"]) == 2, d.keys()
+assert len(d["master"]) == 4 and d["genomes"][0]["flow_cell_id"] == "PAW12345" and len(d["reads"]) == 2, d.keys()
 assert "__DATA__" not in h and "__PLOTLY__" not in h
 print("dashboard self-check: passed")
 EOF
