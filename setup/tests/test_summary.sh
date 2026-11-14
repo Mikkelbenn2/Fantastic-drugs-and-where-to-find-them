@@ -77,6 +77,7 @@ assert gs["BGC_loci_all_tools"] == "4" and gs["short_calls_removed"] == "1" and 
 assert (top["n_tools_agreeing"], known["n_tools_agreeing"], lone["n_tools_agreeing"]) == ("2", "2", "0")
 pc = list(csv.DictReader(open(os.path.join(os.path.dirname(d), "results", "iso1", "14_bgc_prophet", "iso1_coords.tsv")), delimiter="\t"))
 assert [(x["sequence_id"], x["start"], x["end"], x["type"]) for x in pc] == [("ctgA", "10000", "12000", "Polyketide")], pc
+assert pc[0]["terpene_probability"] == "0", pc     # BGC-QUAST rejects unmapped types ("Other") without these
 assert (gs["basecall_model"], gs["flow_cell_id"], gs["run_id"], gs["barcode"]) == \
     ("dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "PAW12345", "abc123def456", "barcode07"), gs
 assert (gs["bakta_db"], gs["CDS"], gs["tRNA"]) == ("v6.0, full", "6", "2"), gs

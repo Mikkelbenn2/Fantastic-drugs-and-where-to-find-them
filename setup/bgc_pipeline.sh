@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.9.0
+#  Version       3.9.1
 #  Created       2026-10-06
 #  Last updated  2026-11-14
 #  License       MIT (see LICENSE)
@@ -18,12 +18,16 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.0 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.1 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.9.1  2026-11-14  BGC-QUAST [C5] fix: BGC-Prophet table now readable when a class is "Other"/"Unknown"/NA
+#                       (adds GECCO *_probability columns = 0); compare-tools ran for only 6 of 12 controls before.
+#                       antiSMASH regions crossing a circular contig's origin (join{}) made BGC-QUAST read the JSON as
+#                       DeepBGC (compare-samples failed, S. venezuelae); it now gets a copy with the longest part.
 #    3.9.0  2026-11-14  BGC-QUAST [C5]: compare-tools per isolate and compare-samples per tool (own env "bgcquast",
 #                       GitHub release BGCQUAST_VERSION), on the BGC page of the dashboard. Filtering of tool calls
 #                       before loci are made: MIN_BGC_LENGTH (3 kb; removes DeepBGC fragments) and AGREE_OVERLAP
@@ -275,7 +279,7 @@ declare -A ENV_PACKAGES=(
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.9.0"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.9.1"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -778,8 +782,21 @@ step_summary() {
 bgcquast_input() {   # bgcquast_input TOOL ISOLATE -> path of that tool's BGC table (empty if missing)
   local sd="$RESULTS_DIR/$2" f
   case $1 in
-    antiSMASH)   f="$sd/08_antismash/$2.json" ;;
-    GECCO)       f=$(compgen -G "$sd/09_gecco/*.clusters.tsv" | head -n 1) ;;
+    antiSMASH)   f="$sd/08_antismash/$2.json"
+                 # BGC-QUAST 1.1.0 cannot read join{} locations (a region crossing the origin of a circular contig)
+                 # and then silently reads the file as DeepBGC. Give it a copy with each join{} cut to its longest
+                 # part. shortcut: the shorter part of such a region (e.g. 9.5 kb of 46 kb) is left out of BGC-QUAST
+                 # only; the summary and ranking use the full region. Upgrade if BGC-QUAST learns join{}.
+                 if [[ -s "$f" ]] && grep -q 'join{' "$f"; then
+                   local fixed="$COMBINED_DIR/bgc_quast/antismash_input/$2.json"   # same file name = same label
+                   [[ -s "$fixed" ]] || { mkdir -p "${fixed%/*}"; run_in_env bgcquast python -c '
+import re, sys
+part = lambda p: int(re.findall(r"\d+", p)[1]) - int(re.findall(r"\d+", p)[0])
+longest = lambda m: max(re.findall(r"\[[<>]?\d+:[<>]?\d+\](?:\([+-]\))?", m.group(1)), key=part)
+open(sys.argv[2], "w").write(re.sub(r"join\{([^}]*)\}", longest, open(sys.argv[1]).read()))' "$f" "$fixed"; }
+                   f=$fixed
+                 fi ;;
+    GECCO)      f=$(compgen -G "$sd/09_gecco/*.clusters.tsv" | head -n 1) ;;
     DeepBGC)     f="$sd/13_deepbgc/13_deepbgc.bgc.tsv" ;;
     BGC-Prophet) f="$sd/14_bgc_prophet/$2_coords.tsv" ;;   # written by the summary (GECCO-style table)
   esac
@@ -1532,9 +1549,14 @@ def main():
         g.update({f"BGCs_{t}": sum(c["tool"] == t for c in tc) for t in TOOLS})
         g["short_calls_removed"] = len(short)
         if pro:   # BGC-Prophet as a GECCO-style table, so BGC-QUAST can read it (1-based, inclusive)
+            # BGC-QUAST rejects the whole file on an empty/"NA" type (pandas NaN) or, for types it cannot map
+            # (Prophet's "Other"), when GECCO's *_probability columns are missing; 0 = Prophet gives none  [C5]
             write(os.path.join(sd, "14_bgc_prophet", f"{s}_coords.tsv"),
                   [{"sequence_id": c["contig"], "cluster_id": c["id"], "start": c["start"], "end": c["end"],
-                    "type": c["bgc_prophet_class"].replace(" ", ";")} for c in pro])
+                    "type": c["bgc_prophet_class"].replace(" ", ";") if c["bgc_prophet_class"] not in ("", NA) else "Unknown",
+                    **dict.fromkeys((f"{k}_probability" for k in
+                                     ("alkaloid", "nrp", "polyketide", "ripp", "saccharide", "terpene")), 0)}
+                   for c in pro])
         loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools,
                            set(a.abx_types.split()), set(a.ml_abx.split()), set(a.non_abx_types.split()),
                            a.agree_overlap)
