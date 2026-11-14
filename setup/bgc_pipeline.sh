@@ -6,9 +6,9 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.8.4
+#  Version       3.9.0
 #  Created       2026-10-06
-#  Last updated  2026-11-13
+#  Last updated  2026-11-14
 #  License       MIT (see LICENSE)
 #
 #  AI assistance
@@ -18,12 +18,17 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.8.4 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.0 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.9.0  2026-11-14  BGC-QUAST [C5]: compare-tools per isolate and compare-samples per tool (own env "bgcquast",
+#                       GitHub release BGCQUAST_VERSION), on the BGC page of the dashboard. Filtering of tool calls
+#                       before loci are made: MIN_BGC_LENGTH (3 kb; removes DeepBGC fragments) and AGREE_OVERLAP
+#                       (tools only support a locus when they overlap >= 50 % of the shorter call); new columns
+#                       n_tools_agreeing, short_calls_removed. BGC-Prophet coordinates as a GECCO-style table.
 #    3.8.4  2026-11-13  setup/controls/make_expected_bgcs.py rebuilds the controls' truth set from MIBiG 4.0.1 (active
 #                       entries, strain TaxID); fuller MIBiG bioactivities -> 27 antimicrobial BGCs (grixazone A added).
 #    3.8.3  2026-11-13  RGI_EXCLUDE_MODELS: CARD mutation/overexpression/knockout models (intrinsic resistome)
@@ -120,7 +125,8 @@
 #   [S01] NanoPlot   [S02] Filtlong   [S03] Flye / genome input   [S05] QUAST   [S06] CheckM2
 #   [S07] Bakta      [S08] antiSMASH  [S09] GECCO   [S10] RGI/CARD   [S13] DeepBGC
 #   [S14] BGC-Prophet   [S15] DIAMOND vs MIBiG
-#   [C1] GTDB-Tk   [C2] GToTree   [C3] BiG-SCAPE   [C4] Summary: loci, novelty + ranking
+#   [C1] GTDB-Tk   [C2] GToTree   [C3] BiG-SCAPE   [C4] Summary: filtering, loci, novelty + ranking
+#   [C5] BGC-QUAST: tools compared per isolate and across isolates
 # Find everything for one box, e.g. antiSMASH:   grep -n '\[S08\]' setup/bgc_pipeline.sh
 
 THREADS=16                     # CPUs per program (inside Slurm: taken from the job)
@@ -189,6 +195,8 @@ RGI_EXCLUDE_MODELS="variant overexpression knockout"   # CARD model types left o
 RUN_GTDBTK=1                   # species ID — needs ~110 GB database + ~64-100 GB RAM  [C1]
 RUN_GTOTREE=1                  # phylogeny of the isolates (+ closest GTDB references)  [C2]
 RUN_BIGSCAPE=1                 # BGC families compared with MIBiG  [C3]
+RUN_BGCQUAST=1                 # BGC-QUAST: tools compared per isolate, each tool across isolates  [C5]
+BGCQUAST_VERSION="1.1.0"       # GitHub release of gurevichlab/bgc-quast (not on bioconda/PyPI)  [C5]
 
 GTDBTK_LOW_MEMORY=1            # 1 = GTDB-Tk's pplacer writes to disk (--scratch_dir) instead of RAM: slower,
                                # far less RAM (normal mode needs ~140 GB for bacteria, GTDB-Tk docs).
@@ -231,6 +239,11 @@ NON_ANTIBIOTIC_TYPES="NRP-metallophore NI-siderophore"   # [C4]
 #   GECCO / DeepBGC / BGC-Prophet classes (used for loci found by >= 2 ML tools without antiSMASH):
 ML_ANTIBIOTIC_CLASSES="Polyketide NRP RiPP"
 RELATED_SIMILARITY=30          # below this (or no hit) = "novel_candidate"  [C4]
+# Filtering of the tool calls before they are merged into loci (also given to BGC-QUAST, so both agree):
+MIN_BGC_LENGTH=3000            # bp; shorter calls are dropped (mostly DeepBGC fragments; on the controls no  [C4]
+                               # known BGC depended on a call < 3 kb)
+AGREE_OVERLAP=0.5              # two tools agree on a locus when their BGCs overlap by >= this fraction of  [C4]
+                               # the shorter one; only agreeing tools count for support and the +1 per tool
 
 # Slurm (only used by "submit")
 SLURM_PARTITION=""             # empty = cluster default
@@ -257,11 +270,12 @@ declare -A ENV_PACKAGES=(
   [gtdbtk]="gtdbtk>=2.7"         # 2.7.x/2.8.x use GTDB release 232
   [gtotree]="gtotree>=1.8"
   [bigscape]="bigscape>=2.0 python=3.11 sqlalchemy=2.0.2"
+  [bgcquast]="python=3.11 pandas biopython pyyaml pip"   # + bgc-quast from GitHub (BGCQUAST_VERSION) in setup
   [dashboard]="r-base>=4.3 libiconv r-shiny r-dt r-plotly r-bslib r-readr r-dplyr r-tidyr r-ggplot2 r-forcats r-patchwork"   # dashboard-live + control figures
 )
 # =========================== END OF SETTINGS =================================
 
-PIPELINE_VERSION="3.8.4"       # keep in sync with the header at the top
+PIPELINE_VERSION="3.9.0"       # keep in sync with the header at the top
 PIPELINE_UPDATED="2026-11-10"
 
 
@@ -754,8 +768,52 @@ step_summary() {
     --out "$COMBINED_DIR/summary" --cutoff "$BIGSCAPE_CUTOFF" --mibig "$(kcb_dir)" \
     --known "$KNOWN_SIMILARITY" --related "$RELATED_SIMILARITY" --min-tools "$SUPPORT_MIN_TOOLS" \
     --abx-types "$ANTIBIOTIC_TYPES" --non-abx-types "$NON_ANTIBIOTIC_TYPES" --ml-abx "$ML_ANTIBIOTIC_CLASSES" \
-    --rgi-exclude "$RGI_EXCLUDE_MODELS" \
-    >>"$STEP_LOG" 2>&1 || return 1
+    --rgi-exclude "$RGI_EXCLUDE_MODELS" --min-bgc-length "$MIN_BGC_LENGTH" --agree-overlap "$AGREE_OVERLAP" \
+    >>"$STEP_LOG" 2>&1
+}
+
+# BGC-QUAST [C5] (Kushnareva, Tupikina et al. 2026): maps what the tools found, with the same length and overlap
+# rules as the summary. compare-tools: the 4 tools on each isolate (shared vs unique BGCs);
+# compare-samples: each tool across all isolates. Only reads the tools' outputs; fast.
+bgcquast_input() {   # bgcquast_input TOOL ISOLATE -> path of that tool's BGC table (empty if missing)
+  local sd="$RESULTS_DIR/$2" f
+  case $1 in
+    antiSMASH)   f="$sd/08_antismash/$2.json" ;;
+    GECCO)       f=$(compgen -G "$sd/09_gecco/*.clusters.tsv" | head -n 1) ;;
+    DeepBGC)     f="$sd/13_deepbgc/13_deepbgc.bgc.tsv" ;;
+    BGC-Prophet) f="$sd/14_bgc_prophet/$2_coords.tsv" ;;   # written by the summary (GECCO-style table)
+  esac
+  [[ -n "$f" && -s "$f" ]] && echo "$f"
+}
+step_bgcquast() {
+  local out="$COMBINED_DIR/bgc_quast" name g t f files labels
+  local opts=(--min-bgc-length "$MIN_BGC_LENGTH" --overlap-fraction "$AGREE_OVERLAP" -t "$THREADS")   # [C5]
+  while IFS=$'\t' read -r name g; do
+    files=(); labels=()
+    for t in antiSMASH GECCO DeepBGC BGC-Prophet; do
+      f=$(bgcquast_input "$t" "$name") && { files+=("$f"); labels+=("$t"); }
+    done
+    [[ ${#files[@]} -ge 2 || $DRY_RUN -eq 1 ]] || { log "    $name: fewer than 2 tool results, no tool comparison"; continue; }
+    run_in_env bgcquast bgc-quast --mode compare-tools "${files[@]}" --names "$(IFS=,; echo "${labels[*]}")" \
+      --genome "$RESULTS_DIR/$name/07_bakta/$name.gbff" "${opts[@]}" -o "$out/compare_tools/$name" \
+      || warn "BGC-QUAST compare-tools failed for $name (continuing)"
+  done < <(finished_genomes)
+  for t in antiSMASH GECCO DeepBGC BGC-Prophet; do
+    files=(); labels=()
+    while IFS=$'\t' read -r name g; do
+      f=$(bgcquast_input "$t" "$name") && { files+=("$f"); labels+=("$name"); }
+    done < <(finished_genomes)
+    [[ ${#files[@]} -ge 1 ]] || continue
+    run_in_env bgcquast bgc-quast --mode compare-samples "${files[@]}" --names "$(IFS=,; echo "${labels[*]}")" \
+      "${opts[@]}" -o "$out/compare_samples/$t" || warn "BGC-QUAST compare-samples failed for $t (continuing)"
+  done
+  return 0
+}
+
+# After summary and BGC-QUAST: control check + evaluation (control runs) and the dashboard
+finish_combined() {
+  [[ $DRY_RUN -eq 1 ]] && return 0
+  local STEP_LOG="$CL/summary.log"
   # the summary folder is rebuilt from scratch, so a control run re-does the control check + evaluation here
   if [[ "$(basename "$RESULTS_DIR")" == *results_controls ]]; then
     { python3 "$SETUP_DIR/controls/check_controls.py" "$COMBINED_DIR/summary" \
@@ -782,8 +840,10 @@ process_combined() {
   [[ $RUN_GTDBTK   -eq 1 ]] && { run_step gtdbtk   "$COMBINED_DIR/gtdbtk"   "$CL" step_gtdbtk   combined || warn "GTDB-Tk failed (continuing)"; }
   [[ $RUN_GTOTREE  -eq 1 ]] && { run_step gtotree  "$COMBINED_DIR/gtotree"  "$CL" step_gtotree  combined || warn "GToTree failed (continuing)"; }
   [[ $RUN_BIGSCAPE -eq 1 ]] && { run_step bigscape "$COMBINED_DIR/bigscape" "$CL" step_bigscape combined || warn "BiG-SCAPE failed (continuing)"; }
-  FORCE_STEPS+=(summary)                       # always rebuild the summary
+  FORCE_STEPS+=(summary bgc_quast)             # always rebuild the summary (and BGC-QUAST, which uses it)
   run_step summary "$COMBINED_DIR/summary" "$CL" step_summary combined || return 1
+  [[ $RUN_BGCQUAST -eq 1 ]] && { run_step bgc_quast "$COMBINED_DIR/bgc_quast" "$CL" step_bgcquast combined || warn "BGC-QUAST failed (continuing)"; }
+  finish_combined
   log "Results: $COMBINED_DIR/summary/master_summary.tsv (all tools merged per BGC locus, ranked)"
   log "         $COMBINED_DIR/summary/per_tool/ (one table per BGC finder, with MIBiG hits)"
 }
@@ -805,6 +865,11 @@ do_setup() {
     # shellcheck disable=SC2086
     "$CONDA_CREATE" create -y -p "$ENV_DIR/$env" "${channels[@]}" ${ENV_PACKAGES[$env]} \
       >>"$MAIN_LOG" 2>&1 || { warn "  $env: install FAILED (see $MAIN_LOG)"; fail=1; }
+    if [[ $env == bgcquast && -d "$ENV_DIR/$env/conda-meta" ]]; then     # not packaged: install the GitHub release
+      "$CONDA_RUN" run -p "$ENV_DIR/$env" pip install \
+        "https://github.com/gurevichlab/bgc-quast/archive/refs/tags/bgc-quast-$BGCQUAST_VERSION.tar.gz" >>"$MAIN_LOG" 2>&1 \
+        || { warn "  bgcquast: pip install FAILED (see $MAIN_LOG)"; rm -rf "${ENV_DIR:?}/$env"; fail=1; }
+    fi
   done
 
   # Links to every BioCloud database (only for finding them; the pipeline reads the SHARED_* paths)
@@ -927,6 +992,8 @@ write_versions() {
       printf '%s\t%s\t%s\n' "$env" "$pkg" "${ver:-not installed}" >>"$out"
     done
   done
+  ver=$("$CONDA_RUN" run -p "$ENV_DIR/bgcquast" bgc-quast --version 2>/dev/null | awk '{print $2}')   # pip-installed
+  printf 'bgcquast\tbgc-quast\t%s\n' "${ver:-not installed}" >>"$out"
 }
 
 # =============================================================================
@@ -1245,6 +1312,12 @@ def mibig_matches(contig, start, end, genes, hits, refs):
     return sorted(found, key=lambda x: (-x[2], -x[3]))
 
 
+def overlap_frac(a, b):
+    """overlap of two calls as a fraction of the shorter one (1-based, inclusive coordinates)"""
+    ov = min(a["end"], b["end"]) - max(a["start"], b["start"]) + 1
+    return max(ov, 0) / max(1, min(a["end"] - a["start"], b["end"] - b["start"]) + 1)
+
+
 def merge_loci(bgcs):  # [C4]
     """group predictions of all tools that overlap on the same contig into one locus"""
     loci = []
@@ -1297,7 +1370,7 @@ def tool_calls(s, regions, gec, dbg, pro, genes, hits, refs, mibig_ran):
 
 def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tools=2,
                 abx_types=frozenset({"NRPS", "T1PKS"}), ml_abx=frozenset({"Polyketide", "NRP", "RiPP"}),
-                non_abx=frozenset({"NRP-metallophore", "NI-siderophore"})):
+                non_abx=frozenset({"NRP-metallophore", "NI-siderophore"}), agree=0.5):
     """merge overlapping predictions of all tools into loci, score and describe each locus"""
     rows = []
     for n, L in enumerate(merge_loci(calls), start=1):
@@ -1305,6 +1378,10 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
         for c in m:
             c["locus_id"] = lid
         tools = sorted({c["tool"] for c in m}, key=TOOLS.index)
+        # tools that AGREE: a call overlapping a call of another tool by >= `agree` of the shorter one
+        # (BGC-QUAST's "shared" idea); a tool that only touches the locus edge does not count  [C4]
+        agreeing = sorted({c["tool"] for c in m for d in m if d["tool"] != c["tool"]
+                           and overlap_frac(c, d) >= agree}, key=TOOLS.index)
 
         def vals(k):
             return ";".join(sorted({str(c[k]) for c in m if c.get(k) not in (None, "", NA)})) or NA
@@ -1319,7 +1396,7 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
         novelty = "known" if sim >= known else ("related" if sim >= related or fam_mibig else "novel_candidate")
         # support: antiSMASH (rule-based) or several tools agree. A locus from one ML tool alone is mostly
         # noise (negative controls), so it gets no novelty or class points  [C4]
-        supported = "antismash" in tools or len(tools) >= min_tools
+        supported = "antismash" in tools or len(agreeing) >= min_tools
         # antibiotic-relevant type: antiSMASH's rule-based type when antiSMASH found it, else the ML classes  [C4]
         if "antismash" in tools:
             types = set(re.split(r"[+;]", vals("antismash_type")))
@@ -1336,11 +1413,11 @@ def master_rows(s, g, calls, res, fam, members, bs_ran, known, related, min_tool
         #          + DeepBGC antibacterial/antifungal >= 0.5 (1) - cut off at contig edge (1)
         score = {"novel_candidate": 3, "related": 1, "known": 0, "novel_other": 0, "low_support": 0}[novelty] \
             + (2 if supported and abx else 0) \
-            + (len(tools) - 1) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
+            + max(len(agreeing) - 1, 0) + (2 if rh else 0) + (1 if activity >= 0.5 else 0) - (1 if edge else 0)
         rows.append({"priority_score": score, "novelty": novelty, "isolate": s, "locus_id": lid,
                      "contig": L["contig"], "start": L["start"], "end": L["end"],
                      "length_kb": round((L["end"] - L["start"] + 1) / 1000, 1),
-                     "n_tools": len(tools), "tools": ";".join(tools), "antibiotic_type": "yes" if abx else "no",
+                     "n_tools": len(tools), "tools": ";".join(tools), "n_tools_agreeing": len(agreeing), "antibiotic_type": "yes" if abx else "no",
                      "antismash_regions": ";".join(c["bgc_id"] for c in m if c["tool"] == "antismash") or NA,
                      **{k: vals(k) for k in ("antismash_type", "antismash_class", "gecco_type", "deepbgc_class",
                                              "deepbgc_activity", "bgc_prophet_class")},
@@ -1424,6 +1501,8 @@ def main():
     ap.add_argument("--abx-types", default="NRPS T1PKS T2PKS T3PKS transAT-PKS")
     ap.add_argument("--non-abx-types", default="NRP-metallophore NI-siderophore")
     ap.add_argument("--rgi-exclude", default="variant overexpression knockout")
+    ap.add_argument("--min-bgc-length", type=int, default=3000)
+    ap.add_argument("--agree-overlap", type=float, default=0.5)
     ap.add_argument("--ml-abx", default="Polyketide NRP RiPP")
     ap.add_argument("--mibig", default="", help="antiSMASH knownclusterblast/<version> folder")
     a = ap.parse_args()
@@ -1448,8 +1527,17 @@ def main():
 
         mibig_ran = os.path.isfile(os.path.join(sd, "15_mibig", f"{s}_vs_mibig.tsv"))
         tc = tool_calls(s, regions, gec, dbg, pro, genes, mibig_hits(sd, s), refs, mibig_ran)
+        short = [c for c in tc if c["end"] - c["start"] + 1 < a.min_bgc_length]   # fragments, dropped  [C4]
+        tc = [c for c in tc if c["end"] - c["start"] + 1 >= a.min_bgc_length]
+        g.update({f"BGCs_{t}": sum(c["tool"] == t for c in tc) for t in TOOLS})
+        g["short_calls_removed"] = len(short)
+        if pro:   # BGC-Prophet as a GECCO-style table, so BGC-QUAST can read it (1-based, inclusive)
+            write(os.path.join(sd, "14_bgc_prophet", f"{s}_coords.tsv"),
+                  [{"sequence_id": c["contig"], "cluster_id": c["id"], "start": c["start"], "end": c["end"],
+                    "type": c["bgc_prophet_class"].replace(" ", ";")} for c in pro])
         loci = master_rows(s, g, tc, res, fam, members, bs_ran, a.known, a.related, a.min_tools,
-                           set(a.abx_types.split()), set(a.ml_abx.split()), set(a.non_abx_types.split()))
+                           set(a.abx_types.split()), set(a.ml_abx.split()), set(a.non_abx_types.split()),
+                           a.agree_overlap)
         g["BGC_loci_all_tools"] = len(loci)
         calls += tc; master += loci
         for h in res:     # which BGC locus a resistance gene sits in (self-resistance hint)

@@ -346,6 +346,11 @@ P.bgcs = () => {
   `<div class="grid">${card("Loci per isolate by novelty", '<div id="pnov" class="plot"></div>')}
    ${card("Priority score of every locus", '<div id="psc" class="plot"></div>')}
    ${card("Size and MIBiG similarity of every locus", '<div id="psim" class="plot"></div>', "wide")}</div>` +
+  (D.bgcquast && D.bgcquast.tools.length ? `<div class="grid">${card("What each tool found, and how much other tools confirm (BGC-QUAST)",
+     '<div id="pbq" class="plot"></div><p class="muted">Shared = another tool covers at least ' + num(setting("agree_overlap", "0.5")) * 100 +
+     ' % of the BGC. Removed = shorter than ' + esc(setting("min_bgc_length", "3000")) + ' bp (fragments; not used for loci). All isolates together.</p>')}
+     ${card("BGC classes per tool, all isolates (BGC-QUAST compare-samples)", '<div id="pbqc" class="plot"></div>')}</div>` +
+     card("Tool comparison per isolate (BGC-QUAST compare-tools)", '<div id="tbq"></div>', "wide") + '<div style="height:18px"></div>' : "") +
   card("All loci", `<div class="tbar chips">Show: ${NOV.map(n => `<label><input type="checkbox" value="${n}" ${state.bgcNov.has(n) ? "checked" : ""}> ${pill(n)}</label>`).join("")}
     <label>min score <input type="number" id="minsc" value="${state.minScore ?? ""}" style="width:60px"></label></div><div id="tbgc"></div>`, "wide");
 };
@@ -362,6 +367,22 @@ P.bgcs.after = () => {
     hovertemplate: "%{text}<br>%{x} kb, %{y} % similar<extra></extra>"}; }),
     {xaxis: {title: "locus length (kb, log)", type: "log", gridcolor: "#ecebe4"}, yaxis: {title: "MIBiG similarity (%)", gridcolor: "#ecebe4"},
      shapes: [30, 80].map(y => ({type: "line", y0: y, y1: y, xref: "paper", x0: 0, x1: 1, line: {dash: "dot", color: "#999"}}))});
+  if (D.bgcquast && D.bgcquast.tools.length) {
+    const T = D.bgcquast.tools, tools = [...new Set(T.map(r => r.label))];
+    const tot = (t, k) => sum(T.filter(r => r.label === t).map(r => num(r[k])));
+    plot("pbq", [["shared with another tool", t => tot(t, "# BGCs") - tot(t, "# unique BGCs"), "#2e5e5a"],
+                 ["found by this tool only", t => tot(t, "# unique BGCs"), "#E69F00"],
+                 ["removed (too short)", t => tot(t, "# BGCs filtered by length"), "#cfcfcf"]].map(([n, f, c]) =>
+      ({type: "bar", name: n, x: tools, y: tools.map(f), marker: {color: c}})), {barmode: "stack", yaxis: {title: "BGCs", gridcolor: "#ecebe4"}});
+    const S = D.bgcquast.samples, cls = ["NRPS", "PKS", "RiPP", "terpene", "saccharide", "hybrid", "unknown"], order = ["antiSMASH", "GECCO", "DeepBGC", "BGC-Prophet"],
+          st = [...new Set(S.map(r => r.group))].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    plot("pbqc", cls.map((c, i) => ({type: "bar", name: c, x: st, y: st.map(t => sum(S.filter(r => r.group === t).map(r => num(r[`# BGCs (${c})`])))),
+      marker: {color: PALETTE[i % PALETTE.length]}})), {barmode: "stack", yaxis: {title: "BGCs", gridcolor: "#ecebe4"}});
+    table("tbq", T.map(r => ({isolate: r.group, ...r})), [{l: "isolate", k: "isolate", f: v => isoLink(v)}, {l: "tool", k: "label"},
+      {l: "BGCs", k: "# BGCs", n: 1}, {l: "unique", k: "# unique BGCs", n: 1}, {l: "unique rate", k: "Unique BGC rate", n: 1, d: 2},
+      {l: "removed (short)", k: "# BGCs filtered by length", n: 1}, {l: "mean length kb", v: r => sc(r["Mean BGC length in bp"], 1000), n: 1, d: 1}],
+      {name: "bgc_quast_compare_tools"});
+  }
   const draw = () => table("tbgc", M.filter(r => state.bgcNov.has(r.novelty) && (state.minScore == null || num(r.priority_score) >= state.minScore)), bgcCols(false), {link: true, name: "bgc_loci"});
   document.querySelectorAll(".chips input[type=checkbox]").forEach(cb => cb.onchange = () => { cb.checked ? state.bgcNov.add(cb.value) : state.bgcNov.delete(cb.value); draw(); });
   document.getElementById("minsc").oninput = e => { state.minScore = e.target.value === "" ? null : +e.target.value; draw(); };

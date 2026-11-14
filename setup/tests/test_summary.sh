@@ -23,10 +23,14 @@ cat >"$R/08_antismash/iso1.json" <<'EOF'
  {"id": "ctgC", "areas": [{"start": 0, "end": 5000, "products": ["NRP-metallophore", "NRPS"], "protoclusters": {"1": {"category": "NRPS"}}}]}]}
 EOF
 printf 'sequence_id\tcluster_id\tstart\tend\taverage_p\tmax_p\ttype\nctgA\tctgA_cluster_1\t950\t3900\t0.9\t0.99\tNRP\n' >"$R/09_gecco/iso1.clusters.tsv"
+# GECCO call that only touches the end of the lone DeepBGC call on ctgB (51 bp of 1301): NOT agreement
+printf 'ctgB\tctgB_cluster_1\t1350\t3000\t0.9\t0.99\tNRP\n' >>"$R/09_gecco/iso1.clusters.tsv"
 printf 'sequence_id\tbgc_candidate_id\tnucl_start\tnucl_end\tdeepbgc_score\tproduct_class\tproduct_activity\tantibacterial\tantifungal\tcytotoxic\tinhibitor\n' >"$R/13_deepbgc/13_deepbgc.bgc.tsv"
 printf 'ctgA\tctgA_9899-12100.1\t9899\t12100\t0.7\tPolyketide\tantibacterial\t0.8\t0.1\t0.2\t0.1\n' >>"$R/13_deepbgc/13_deepbgc.bgc.tsv"
 # lone DeepBGC call on ctgB (no other tool, no MIBiG hit): must become low_support, not a candidate
 printf 'ctgB\tctgB_99-1400.1\t99\t1400\t0.6\tPolyketide\tantibacterial\t0.9\t0.1\t0.1\t0.1\n' >>"$R/13_deepbgc/13_deepbgc.bgc.tsv"
+# a 500 bp DeepBGC fragment: shorter than --min-bgc-length (1000 here), must be dropped before loci are made
+printf 'ctgA\tctgA_19999-20500.1\t19999\t20500\t0.9\tPolyketide\tantibacterial\t0.9\t0.1\t0.1\t0.1\n' >>"$R/13_deepbgc/13_deepbgc.bgc.tsv"
 cat >"$R/14_bgc_prophet/iso1_classified.csv" <<'EOF'
 ID,sentence,labels,isBGC,TDsentence,TDlabels,probability
 iso1_0,"['g4', 'g5']",Polyketide,Yes,g1 g2,0 0,0.910
@@ -43,7 +47,7 @@ printf '@r1 runid=abc123def456 start_time=2026-09-01T10:00:00Z flow_cell_id=PAW1
 printf '#seq_name\tlength\tcov.\tcirc.\nctgA\t12\t50\tY\nctgB\t4\t80\tN\n' >"$R/03_flye/assembly_info.txt"
 printf '>ctgA desc\nACGTACGT\nACGT\n>ctgB\nACGT\n' >"$R/03_flye/iso1.fasta"
 printf 'Database: v6.0, full\nCDSs: 6\ntRNAs: 2\n' >"$R/07_bakta/iso1.txt"
-python3 "$T/summary.py" --results "$T/results" --samples iso1 --out "$T/out" --mibig "$K" 2>/dev/null
+python3 "$T/summary.py" --results "$T/results" --samples iso1 --out "$T/out" --mibig "$K" --min-bgc-length 1000 2>/dev/null
 python3 - "$T/out" <<'EOF'
 import csv, os, sys
 d = sys.argv[1]
@@ -55,7 +59,7 @@ assert (top["tools"], top["novelty"], top["priority_score"]) == ("deepbgc;bgc_pr
 assert (top["closest_MIBiG"], top["MIBiG_similarity_pct"]) == ("BGC0000002", "25"), top        # 1 of 4 genes
 assert top["resistance_gene_in_locus"].startswith("testR") and top["completeness"] == "NA"
 assert (known["tools"], known["novelty"], known["priority_score"]) == ("antismash;gecco", "known", "3"), known
-assert (lone["tools"], lone["novelty"], lone["priority_score"]) == ("deepbgc", "low_support", "1"), lone
+assert (lone["tools"], lone["novelty"], lone["priority_score"]) == ("gecco;deepbgc", "low_support", "1"), lone   # touching != agreeing
 assert (top["antibiotic_type"], known["antibiotic_type"]) == ("yes", "yes")       # ML Polyketide / antiSMASH NRPS
 # NRPS siderophore (antiSMASH NRP-metallophore): never antibiotic-relevant -> novel_other, no +2
 assert (sidero["antismash_type"], sidero["antibiotic_type"], sidero["novelty"], sidero["priority_score"]) == \
@@ -69,7 +73,10 @@ assert g["MIBiG_all_hits"] == "BGC0000001:100", g
 assert rd("per_tool/antismash_bgcs.tsv")[0]["MIBiG_all_hits"] == "BGC0000001:100"
 assert rd("per_tool/deepbgc_bgcs.tsv")[0]["start"] == "9900"                                  # 0-based -> 1-based
 gs = rd("genome_summary.tsv")[0]
-assert gs["BGC_loci_all_tools"] == "4"
+assert gs["BGC_loci_all_tools"] == "4" and gs["short_calls_removed"] == "1" and gs["BGCs_deepbgc"] == "2", gs
+assert (top["n_tools_agreeing"], known["n_tools_agreeing"], lone["n_tools_agreeing"]) == ("2", "2", "0")
+pc = list(csv.DictReader(open(os.path.join(os.path.dirname(d), "results", "iso1", "14_bgc_prophet", "iso1_coords.tsv")), delimiter="\t"))
+assert [(x["sequence_id"], x["start"], x["end"], x["type"]) for x in pc] == [("ctgA", "10000", "12000", "Polyketide")], pc
 assert (gs["basecall_model"], gs["flow_cell_id"], gs["run_id"], gs["barcode"]) == \
     ("dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "PAW12345", "abc123def456", "barcode07"), gs
 assert (gs["bakta_db"], gs["CDS"], gs["tRNA"]) == ("v6.0, full", "6", "2"), gs

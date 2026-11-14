@@ -40,6 +40,26 @@ for src in (rows(project, "metadata.tsv"), rows(here, "..", "controls", "control
         iso = r.get("isolate") or next(iter(r.values()), "")
         if iso in names:
             meta.setdefault(iso, {}).update({k: v for k, v in r.items() if k != "isolate" and v})
+
+
+def bgcquast(mode):
+    """BGC-QUAST report.tsv files (metrics as rows, one column per tool or isolate) -> long rows"""
+    out = []
+    for p in sorted(glob.glob(os.path.join(summ, "..", "bgc_quast", mode, "*", "report.tsv"))):
+        with open(p, newline="") as fh:
+            t = list(csv.reader(fh, delimiter="\t"))
+        if len(t) < 3:
+            continue
+        group = os.path.basename(os.path.dirname(p))      # isolate (compare_tools) or tool (compare_samples)
+        for j, col in enumerate(t[0][1:], start=1):
+            r = {"group": group, "label": col}
+            r.update({m[0]: m[j] for m in t[2:] if len(m) > j and m[0] in KEEP or (len(m) > j and m[0].startswith("# BGCs ("))})
+            out.append(r)
+    return out
+
+
+KEEP = {"# BGCs filtered by length", "# BGCs", "# unique BGCs", "Unique BGC rate", "Mean BGC length in bp",
+        "Mean BGC length in genes", "Total BGC span in bp"}
 versions = rows(summ, "software_versions.tsv") or rows(summ, "..", "..", "software_versions.tsv")
 
 data = {
@@ -49,6 +69,7 @@ data = {
     "reads": [[r["isolate"], int(r["length"]), float(r["meanQ"])] for r in rows(summ, "reads_sample.tsv")],
     "resistance": rows(summ, "resistance_genes.tsv"), "settings": rows(summ, "settings.tsv"),
     "versions": versions, "metadata": meta,
+    "bgcquast": {"tools": bgcquast("compare_tools"), "samples": bgcquast("compare_samples")},
     "controls": {"recovery": rows(summ, "controls_recovery.tsv"), "loci": rows(summ, "controls_loci.tsv"),
                  "expected": rows(summ, "controls_expected_bgcs.tsv"),
                  **{k: rows(summ, f"eval_{k}.tsv") for k in ("confusion", "metrics", "auc", "roc", "detection")}},

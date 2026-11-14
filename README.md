@@ -42,7 +42,8 @@ The **Tag** matches the box in the flowchart and the `[tag]` at the end of every
 | C1 | **GTDB-Tk** | Species identification from the genome | Much finer than 16S. "No species match" means a possible new species | `_combined/gtdbtk/` |
 | C2 | **GToTree** | Phylogenetic tree | Places the isolates next to their closest reference genomes | `_combined/gtotree/` |
 | C3 | **BiG-SCAPE** | Groups BGCs into families together with MIBiG | A family *without* any known (MIBiG) member means no characterised relative | `_combined/bigscape/` |
-| C4 | **Summary** | One table per tool, plus a master table that merges all tools and ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
+| C4 | **Summary** | Drops tool calls shorter than 3 kb (`MIN_BGC_LENGTH`); one table per tool, plus a master table that merges all tools (they must overlap ≥ 50 %, `AGREE_OVERLAP`, to count as agreeing) and ranks every BGC | Tells you which clusters to look at first | `_combined/summary/` |
+| C5 | **BGC-QUAST** | compare-tools: the four tools on each isolate (shared vs unique BGCs); compare-samples: each tool across all isolates (BGC counts, classes, lengths) | Shows how much the tools agree and what each one adds; same length/overlap rules as C4 | `_combined/bgc_quast/` |
 
 ---
 
@@ -189,7 +190,8 @@ Predictions from the four tools that overlap on the same contig are merged into 
 |---|---|
 | `rank`, `priority_score`, `novelty` | Order in which to inspect the loci (see the score below) |
 | `isolate`, `locus_id`, `contig`, `start`, `end`, `length_kb` | Where the locus is (start/end span all tools' predictions) |
-| `tools`, `n_tools` | Which tools found it. Found by several tools = well supported |
+| `tools`, `n_tools` | Which tools found it (any overlap) |
+| `n_tools_agreeing` | How many of them really agree (overlap ≥ `AGREE_OVERLAP` of the shorter BGC). Used for support and the score |
 | `antismash_regions`, `antismash_type`, `antismash_class`, `gecco_type`, `deepbgc_class`, `bgc_prophet_class` | Each tool's prediction of the product type |
 | `deepbgc_activity`, `deepbgc_max_antibacterial_or_antifungal` | DeepBGC's activity prediction and its highest antibacterial/antifungal score |
 | `closest_MIBiG`, `closest_MIBiG_compound`, `MIBiG_similarity_pct`, `MIBiG_from` | Best MIBiG match over all tools' predictions, and which tool/method gave it |
@@ -233,7 +235,7 @@ One row per BGC as that tool predicted it, with the tool's own scores and the sa
 |---|---|
 | `novel_candidate` / `related` / `novel_other`, `low_support` | +3 / +1 / 0 |
 | Antibiotic-relevant type (see above), only for loci found by antiSMASH or ≥ 2 tools | +2 |
-| Each extra tool that found the locus | +1 (max +3) |
+| Each extra tool that agrees on the locus (overlap ≥ 50 %) | +1 (max +3) |
 | Resistance gene inside the locus | +2 |
 | DeepBGC antibacterial or antifungal score ≥ 0.5 | +1 |
 | On a contig edge | −1 |
@@ -262,6 +264,8 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `MIBIG_EVALUE` | 1e-05 | DIAMOND e-value for the MIBiG comparison of all tools |
 | `ANTIBIOTIC_TYPES`, `ML_ANTIBIOTIC_CLASSES` | see settings | Which BGC types can be novel antibiotic candidates |
 | `NON_ANTIBIOTIC_TYPES` | `NRP-metallophore NI-siderophore` | antiSMASH siderophore types: such loci are never antibiotic candidates |
+| `MIN_BGC_LENGTH` | `3000` | Tool calls shorter than this (bp) are dropped before loci are made, mostly DeepBGC fragments. Also given to BGC-QUAST |
+| `AGREE_OVERLAP` | `0.5` | Two tools agree on a locus when their BGCs overlap by at least this fraction of the shorter one; only agreeing tools count as support and for the +1 per tool. Also BGC-QUAST's `--overlap-fraction` |
 | `RGI_EXCLUDE_MODELS` | `variant overexpression knockout` | CARD model types left out of resistance counts and the score (mutations in housekeeping genes, regulators): the intrinsic resistome, not BGC self-resistance. Empty = keep all |
 | `SUPPORT_MIN_TOOLS` | 2 | Number of tools that must agree before a locus without antiSMASH counts as a candidate (1 = old behaviour) |
 | `GTDBTK_LOW_MEMORY`, `GTDBTK_PPLACER_CPUS` | 1, 1 | GTDB-Tk low-memory mode (slower, needs free disk). Set `GTDBTK_LOW_MEMORY=0` only with ≥ 150 GB RAM |
@@ -342,13 +346,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.8.4 (last updated 2026-11-13) |
+| **Version** | 3.9.0 (last updated 2026-11-14) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.8.4: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.9.0: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
