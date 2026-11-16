@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1900" viewBox="0 0 1800 1900" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#111"/></marker></defs>
+<rect width="1800" height="1900" fill="#ffffff"/>
+<text x="900.0" y="50" font-size="30" font-weight="700" text-anchor="middle" fill="#111">bgc_pipeline.sh v3.9.1 — Oxford Nanopore isolate genomes to novel antimicrobial BGCs</text>
+<rect x="690.0" y="90" width="420" height="110" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="119.9" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">INPUT</text>
+<text x="900.0" y="140.1" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">ONT R10.4.1 reads, Dorado sup basecalling (FASTQ, one</text>
+<text x="900.0" y="160.4" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">per isolate)</text>
+<text x="900.0" y="180.6" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">or a finished genome FASTA (.fna): skips S01–S03</text>
+<rect x="690.0" y="250" width="420" height="115" rx="16" fill="#3f7d3a" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="292.5" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S02] Filtlong ≥0.2.1 – read filtering</text>
+<text x="900.0" y="312.8" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">min read length 1000 bp; keep best 95 % of bases; target</text>
+<text x="900.0" y="333.0" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">bases: off (optional cap); read stats with SeqKit</text>
+<rect x="40" y="240" width="400" height="105" rx="16" fill="#1f4a2c" stroke="#111111" stroke-width="2.5"/>
+<text x="240.0" y="287.6" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S01] NanoPlot ≥1.42 – read QC</text>
+<text x="240.0" y="307.9" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">read length and quality of raw and filtered reads</text>
+<polyline points="690.0,145 480,145 480,280 448,280" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="690.0,310 448,310" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="900,200 900,242" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="690.0" y="415" width="420" height="105" rx="16" fill="#3f7d3a" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="452.5" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S03] Flye ≥2.9.5 – assembly</text>
+<text x="900.0" y="472.8" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">mode --nano-hq; genome size estimated by Flye; no</text>
+<text x="900.0" y="493.0" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">polishing</text>
+<polyline points="900,365 900,407" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="40" y="395" width="400" height="95" rx="16" fill="#1f4a2c" stroke="#111111" stroke-width="2.5"/>
+<text x="240.0" y="427.5" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S06] CheckM2 ≥1.0.2 – completeness &amp;</text>
+<text x="240.0" y="447.8" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">contamination</text>
+<text x="240.0" y="468.0" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">completeness &gt;95 %; contamination &lt;5 % (guide values)</text>
+<rect x="40" y="510" width="400" height="85" rx="16" fill="#1f4a2c" stroke="#111111" stroke-width="2.5"/>
+<text x="240.0" y="547.6" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S05] QUAST ≥5.2 – assembly QC</text>
+<text x="240.0" y="567.9" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">contigs, total length, N50, GC %</text>
+<polyline points="690.0,467 480,467 480,442 448,442" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="480,467 480,552 448,552" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="1360" y="395" width="400" height="95" rx="16" fill="#b3cdf7" stroke="#0b1f4d" stroke-width="2.5"/>
+<text x="1560.0" y="427.5" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">[C1] GTDB-Tk ≥2.7 – taxonomy</text>
+<text x="1560.0" y="447.8" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">classify_wf with GTDB release 232; no species match =</text>
+<text x="1560.0" y="468.0" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">possible new species</text>
+<rect x="1360" y="510" width="400" height="85" rx="16" fill="#b3cdf7" stroke="#0b1f4d" stroke-width="2.5"/>
+<text x="1560.0" y="537.5" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">[C2] GToTree ≥1.8 – phylogeny</text>
+<text x="1560.0" y="557.8" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">Bacteria marker genes + closest GTDB reference</text>
+<text x="1560.0" y="578.0" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">genomes</text>
+<polyline points="1110.0,467 1320,467 1320,442 1352,442" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="1320,467 1320,552 1352,552" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="690.0" y="640" width="420" height="100" rx="16" fill="#3f7d3a" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="675.0" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S07] Bakta ≥1.10 – gene annotation</text>
+<text x="900.0" y="695.2" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">light database; keeps contig headers; its genes are used</text>
+<text x="900.0" y="715.5" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">by all later tools</text>
+<polyline points="900,520 900,632" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<text x="40" y="757" font-size="22" font-weight="700" text-anchor="start" fill="#111">BGC detection – four finders run in parallel</text>
+<polyline points="900,740 900,772" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="200.0,772 1600,772" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="200.0,772 200.0,822" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="545.0,772 545.0,822" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="890.0,772 890.0,822" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="1235.0,772 1235.0,822" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="1600,772 1600,822" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="40" y="830" width="320" height="175" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="200.0" y="872.1" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S08] antiSMASH ≥8.0</text>
+<text x="200.0" y="892.4" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">rule-based; taxon bacteria;</text>
+<text x="200.0" y="912.6" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">KnownClusterBlast, SubClusterBlast,</text>
+<text x="200.0" y="932.9" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">ClusterCompare MIBiG, ASF, RRE, TFBS,</text>
+<text x="200.0" y="953.1" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Pfam2GO, ClusterHMMer, TIGRFAM, smCoG</text>
+<text x="200.0" y="973.4" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">trees</text>
+<rect x="385" y="830" width="320" height="175" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="545.0" y="902.5" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S09] GECCO ≥0.9.10</text>
+<text x="545.0" y="922.8" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">CRF machine learning; probability</text>
+<text x="545.0" y="943.0" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">threshold 0.8; minimum 3 genes</text>
+<rect x="730" y="830" width="320" height="175" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="890.0" y="902.5" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S13] DeepBGC ≥0.1.31</text>
+<text x="890.0" y="922.8" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">BiLSTM on Pfam domains; score ≥0.5;</text>
+<text x="890.0" y="943.0" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">predicts class and activity</text>
+<rect x="1075" y="830" width="320" height="175" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="1235.0" y="892.4" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S14] BGC-Prophet ≥0.1.2</text>
+<text x="1235.0" y="912.6" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">ESM-2 protein language model; gene score</text>
+<text x="1235.0" y="932.9" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">0.5; class score 0.5; max gap 3 genes;</text>
+<text x="1235.0" y="953.1" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">minimum 2 genes</text>
+<rect x="1440" y="830" width="320" height="175" rx="16" fill="#b3cdf7" stroke="#0b1f4d" stroke-width="2.5"/>
+<text x="1600.0" y="882.2" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">[S10] RGI ≥6.0 + CARD – resistance</text>
+<text x="1600.0" y="902.5" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">genes</text>
+<text x="1600.0" y="922.8" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">DIAMOND; variant, overexpression and</text>
+<text x="1600.0" y="943.0" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">knockout models left out; a resistance</text>
+<text x="1600.0" y="963.2" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">gene inside a BGC suggests self-resistance</text>
+<polyline points="200.0,1005 200.0,1045" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="545.0,1005 545.0,1045" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="890.0,1005 890.0,1045" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="1235.0,1005 1235.0,1045" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="200.0,1045 1235.0,1045" fill="none" stroke="#111" stroke-width="3"/>
+<polyline points="900,1045 900,1077" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="650" y="1085" width="500" height="150" rx="16" fill="#3f7d3a" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="1124.8" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[S15] DIAMOND vs MIBiG 4.0 – closest known BGC for every</text>
+<text x="900.0" y="1145.0" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">tool</text>
+<text x="900.0" y="1165.2" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">proteins vs antiSMASH KnownClusterBlast data; e-value 1e-5; hit =</text>
+<text x="900.0" y="1185.5" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">identity &gt;45 % and coverage &gt;40 %; similarity = % of MIBiG cluster</text>
+<text x="900.0" y="1205.8" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">genes hit</text>
+<rect x="690.0" y="1280" width="420" height="95" rx="16" fill="#b3cdf7" stroke="#0b1f4d" stroke-width="2.5"/>
+<text x="900.0" y="1312.5" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">[C3] BiG-SCAPE ≥2.0 – gene cluster families</text>
+<text x="900.0" y="1332.8" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">together with MIBiG 4.0; cut-off 0.30; singletons</text>
+<text x="900.0" y="1353.0" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">included</text>
+<polyline points="900,1235 900,1272" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="900,1375 900,1417" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="500" y="1425" width="800" height="265" rx="16" fill="#2b5ce6" stroke="#111111" stroke-width="2.5"/>
+<text x="900.0" y="1491.9" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle">[C4] Summary and ranking</text>
+<text x="900.0" y="1512.1" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Filter: tool calls shorter than 3 kb are dropped (MIN_BGC_LENGTH).</text>
+<text x="900.0" y="1532.4" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Merge overlapping calls of all tools into loci; tools agree when they overlap ≥50 % of the shorter call.</text>
+<text x="900.0" y="1552.6" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Supported = found by antiSMASH or by ≥2 tools.</text>
+<text x="900.0" y="1572.9" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Novelty: known = MIBiG similarity ≥80 %; related = 30–79 % or a BiG-SCAPE family with a MIBiG member;</text>
+<text x="900.0" y="1593.1" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">novel candidate = below 30 % and an antibiotic-relevant type (siderophores excluded).</text>
+<text x="900.0" y="1613.4" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">Priority score = novelty (3 / 1 / 0) + antibiotic-relevant type (+2) + each extra agreeing tool (+1) +</text>
+<text x="900.0" y="1633.6" fill="#ffffff" font-size="15" font-weight="400" text-anchor="middle">resistance gene inside (+2) + DeepBGC antibacterial or antifungal ≥0.5 (+1) − cut at contig edge (−1)</text>
+<polyline points="1600,1005 1600,1557.5 1308,1557.5" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="40" y="1445" width="400" height="225" rx="16" fill="#f6b74a" stroke="#111111" stroke-width="2.5"/>
+<text x="240.0" y="1502.0" fill="#2a1a00" font-size="16" font-weight="700" text-anchor="middle">[C5] BGC-QUAST 1.1.0 – tool comparison</text>
+<text x="240.0" y="1522.2" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">compare-tools: the four finders on each isolate</text>
+<text x="240.0" y="1542.5" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">(shared vs unique BGCs)</text>
+<text x="240.0" y="1562.8" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">compare-samples: each finder across all isolates</text>
+<text x="240.0" y="1583.0" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">(counts, classes, lengths)</text>
+<text x="240.0" y="1603.2" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">same 3 kb and 50 % rules as C4; a quality check that</text>
+<text x="240.0" y="1623.5" fill="#2a1a00" font-size="15" font-weight="400" text-anchor="middle">does not change the ranking</text>
+<polyline points="200.0,1045 160.0,1045 160.0,1437" fill="none" stroke="#111" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#a)"/>
+<text x="148.0" y="1250" font-size="14" font-weight="400" text-anchor="end" fill="#111">finder outputs</text>
+<polyline points="500,1557.5 448,1557.5" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<polyline points="900,1690 900,1727" fill="none" stroke="#111" stroke-width="3" marker-end="url(#a)"/>
+<rect x="570" y="1735" width="660" height="105" rx="16" fill="#eef2fa" stroke="#0b1f4d" stroke-width="2.5"/>
+<text x="900.0" y="1762.4" fill="#0b1f4d" font-size="16" font-weight="700" text-anchor="middle">OUTPUT</text>
+<text x="900.0" y="1782.6" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">master_summary.tsv (all tools, ranked); per_tool tables with MIBiG hits;</text>
+<text x="900.0" y="1802.9" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">genome_summary.tsv (QC + taxonomy); dashboard.html (one file to share, incl. BGC-QUAST</text>
+<text x="900.0" y="1823.1" fill="#0b1f4d" font-size="15" font-weight="400" text-anchor="middle">reports)</text>
+<text x="900.0" y="1880" font-size="15" font-weight="400" text-anchor="middle" fill="#111">Tags [S01]–[C5] match the settings and code lines in setup/bgc_pipeline.sh (find them with: grep -n '\[S08\]' setup/bgc_pipeline.sh). Slurm: 16 CPU / 64 GB per isolate; 8 CPU / 64 GB for the combined steps.</text>
+</svg>
