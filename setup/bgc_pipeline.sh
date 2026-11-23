@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.9.1
+#  Version       3.9.2
 #  Created       2026-10-06
 #  Last updated  2026-11-14
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.1 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.2 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.9.2  2026-11-23  Unaligned BAM input: a folder of .bam files (Dorado bam_pass/barcodeNN) is one isolate;
+#                       converted with samtools fastq (new env "samtools": run setup once more).
 #    3.9.1  2026-11-14  BGC-QUAST [C5] fix: BGC-Prophet table now readable when a class is "Other"/"Unknown"/NA
 #                       (adds GECCO *_probability columns = 0); compare-tools ran for only 6 of 12 controls before.
 #                       antiSMASH regions crossing a circular contig's origin (join{}) made BGC-QUAST read the JSON as
@@ -262,6 +264,7 @@ SLURM_COMBINED_CPUS=8;  SLURM_COMBINED_MEM="64G";  SLURM_COMBINED_TIME="1-00:00:
 # Program versions (minimum). Exact installed versions are logged in results/software_versions.tsv
 declare -A ENV_PACKAGES=(
   [reads]="nanoplot>=1.42 filtlong>=0.2.1 seqkit>=2.8"
+  [samtools]="samtools>=1.19"          # own env so "setup" adds it to existing installs; BAM input
   [flye]="flye>=2.9.5"
   [quast]="quast>=5.2 python=3.11"   # QUAST still imports distutils, which Python 3.12+ removed
   [checkm2]="checkm2>=1.0.2"
@@ -457,7 +460,7 @@ run_step() {
 
 # ---------- find the isolates in raw_data/ ------------------------------------
 # Each FASTQ file = one isolate (name = file name without .fastq.gz etc.)
-# Each folder containing FASTQ files = one isolate (name = folder name)
+# Each folder containing FASTQ or unaligned BAM files (Dorado bam_pass/barcodeNN) = one isolate (name = folder name)
 # Each FASTA file (.fasta/.fna/.fa, may be .gz) = a finished genome: no read QC or assembly
 find_samples() {
   [[ -d "$RAW_DIR" ]] || die "No input folder found at $RAW_DIR"
@@ -466,7 +469,7 @@ find_samples() {
   while IFS= read -r p; do
     name=$(basename "$p")
     if [[ -d "$p" ]]; then
-      compgen -G "$p/*.f*q*" >/dev/null || continue           # folder without FASTQ: ignore
+      compgen -G "$p/*.f*q*" >/dev/null || compgen -G "$p/*.bam" >/dev/null || continue  # no reads: ignore
     else
       [[ "$name" =~ \.(fastq|fq|fasta|fna|fa)(\.gz)?$ ]] || continue
       name=${name%.gz}; name=${name%.*}
@@ -515,6 +518,11 @@ join_reads() {
         *.fastq|*.fq) gzip -c "$f" >>"$READS" ;;
       esac
     done
+    # Unaligned BAM from Dorado/MinKNOW: convert to FASTQ (read tags are dropped)
+    if compgen -G "$SRC/*.bam" >/dev/null; then
+      run_in_env samtools bash -c 'set -o pipefail; out=$1; shift; for b in "$@"; do samtools fastq "$b"; done | gzip -c >>"$out"' \
+        _ "$READS" "$SRC"/*.bam || return 1
+    fi
   elif [[ "$SRC" == *.gz ]]; then ln -sf "$SRC" "$READS"
   else gzip -c "$SRC" >"$READS"
   fi

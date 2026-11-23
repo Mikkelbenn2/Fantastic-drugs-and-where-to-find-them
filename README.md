@@ -138,6 +138,7 @@ Fantastic-drugs-and-where-to-find-them/
 ├── 1_raw_data/                  ← your reads
 │   ├── isolate1.fastq.gz         one file per isolate, or
 │   └── barcode02/                one folder per isolate (many FASTQ files are joined)
+│   └── barcode03/                or a folder of unaligned .bam files (Dorado bam_pass/barcodeNN; needs samtools from setup)
 │   └── strainX.fna               or a finished genome (.fasta/.fna/.fa): no read QC or assembly
 ├── setup/
 │   ├── bgc_pipeline.sh        ← the pipeline
@@ -346,13 +347,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.9.1 (last updated 2026-11-14) |
+| **Version** | 3.9.2 (last updated 2026-11-23) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.9.1: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.9.2: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
