@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.9.2
+#  Version       3.9.3
 #  Created       2026-10-06
 #  Last updated  2026-11-14
 #  License       MIT (see LICENSE)
@@ -18,12 +18,14 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.2 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.3 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.9.3  2026-11-23  FILTLONG_TARGET_BASES now 800000000 by default: isolates with 4-8 Gb of reads
+#                       (~1000x) made Flye stop with "No disjointigs were assembled".
 #    3.9.2  2026-11-23  Unaligned BAM input: a folder of .bam files (Dorado bam_pass/barcodeNN) is one isolate;
 #                       converted with samtools fastq (new env "samtools": run setup once more).
 #    3.9.1  2026-11-14  BGC-QUAST [C5] fix: BGC-Prophet table now readable when a class is "Other"/"Unknown"/NA
@@ -146,7 +148,8 @@ FLYE_READ_MODE="nano-hq"  # [S03]
 GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it  [S03]
 FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)  [S02]
 FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases  [S02]
-FILTLONG_TARGET_BASES=""       # optional cap, e.g. 800000000 (= 100x of an 8 Mb genome)  [S02]
+FILTLONG_TARGET_BASES="800000000"  # cap: keep the best 800 Mb (~100x of an 8 Mb genome); Flye fails  [S02]
+                                  # ("No disjointigs") at ~1000x. "" = keep all reads
 
 BAKTA_DB_TYPE="light"          # "light" (~1.5 GB) or "full" (~32 GB download; only if the internet is fast)  [S07]
 
