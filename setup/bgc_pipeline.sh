@@ -6,7 +6,7 @@
 #  Author        Mikkel Bennetsen (GitHub: @Mikkelbenn2)
 #                Aalborg University (AAU), 7th-semester project (P7), 2026
 #  Repository    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
-#  Version       3.9.3
+#  Version       3.9.4
 #  Created       2026-10-06
 #  Last updated  2026-11-14
 #  License       MIT (see LICENSE)
@@ -18,12 +18,16 @@
 #    tweaked the parameters.
 #
 #  How to cite
-#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.3 — a Nanopore pipeline for
+#    Bennetsen M. (2026). bgc_pipeline.sh v3.9.4 — a Nanopore pipeline for
 #    screening soil isolates for novel biosynthetic gene clusters.
 #    https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 #    Please also cite the individual programs it runs (see README.md).
 #
 #  Changelog
+#    3.9.4  2026-11-24  Filtlong adapts to the read QC: FILTLONG_KEEP_PERCENT now "" (off) by default, so
+#                       low-yield isolates keep every read >= 1 kb and only the 800 Mb cap trims deep ones.
+#                       Warns when the filtered reads give < 30x of the assembly (short-read libraries,
+#                       e.g. ControlISP2: median read 184 bp, so 93 % of its bases are in reads < 1 kb).
 #    3.9.3  2026-11-23  FILTLONG_TARGET_BASES now 800000000 by default: isolates with 4-8 Gb of reads
 #                       (~1000x) made Flye stop with "No disjointigs were assembled".
 #    3.9.2  2026-11-23  Unaligned BAM input: a folder of .bam files (Dorado bam_pass/barcodeNN) is one isolate;
@@ -146,8 +150,8 @@ THREADS=16                     # CPUs per program (inside Slurm: taken from the 
 # reads give frameshifts in long NRPS/PKS genes.
 FLYE_READ_MODE="nano-hq"  # [S03]
 GENOME_SIZE=""                 # e.g. "8m" for Streptomyces; empty = Flye estimates it  [S03]
-FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp)  [S02]
-FILTLONG_KEEP_PERCENT=95       # keep the best 95 % of bases  [S02]
+FILTLONG_MIN_LEN=1000          # drop reads shorter than this (bp); Flye cannot use them anyway (min overlap >= 1 kb)  [S02]
+FILTLONG_KEEP_PERCENT=""       # "" = off. e.g. 95 = always drop the worst 5 % of bases, also in low-yield isolates  [S02]
 FILTLONG_TARGET_BASES="800000000"  # cap: keep the best 800 Mb (~100x of an 8 Mb genome); Flye fails  [S02]
                                   # ("No disjointigs") at ~1000x. "" = keep all reads
 
@@ -543,7 +547,8 @@ step_nanoplot() {
 # 02 Filtlong — remove short and low-quality reads so Flye gets cleaner input.  [S02]
 step_filtlong() {
   [[ $DRY_RUN -eq 1 || -s "$READS" ]] || join_reads || return 1
-  local args=(--min_length "$FILTLONG_MIN_LEN" --keep_percent "$FILTLONG_KEEP_PERCENT")  # [S02]
+  local args=(--min_length "$FILTLONG_MIN_LEN")  # [S02]
+  [[ -n "$FILTLONG_KEEP_PERCENT" ]] && args+=(--keep_percent "$FILTLONG_KEEP_PERCENT")
   [[ -n "$FILTLONG_TARGET_BASES" ]] && args+=(--target_bases "$FILTLONG_TARGET_BASES")
   # Filtlong writes to the screen, so a pipe to gzip is needed -> run it via bash -c
   run_in_env reads bash -c 'set -o pipefail; out=$1; shift; filtlong "$@" | gzip -c > "$out"' \
@@ -561,7 +566,14 @@ step_flye() {
   run_in_env flye flye "${args[@]}" || return 1
   need "$DRAFT" || return 1
   run_plain cp "$DRAFT" "$GENOME" || return 1     # no polishing: the Flye assembly is the genome
-  need "$GENOME"
+  need "$GENOME" || return 1
+  # read QC check: filtered bases / assembly length; < 30x usually means a short-read library  [S02]
+  local rs="$SD/02_filtlong/read_stats.tsv" depth
+  [[ -s "$rs" && -s "$GENOME" ]] || return 0
+  depth=$(awk -F'\t' 'NR==FNR { if (FNR==1) for (i=1;i<=NF;i++) c[$i]=i; else if ($c["file"] ~ /filtered/) b=$c["sum_len"]; next }
+                      !/^>/ { L += length($0) } END { if (L) printf "%.0f", b / L }' "$rs" "$GENOME")
+  [[ -n "$depth" && "$depth" -lt 30 ]] && warn "$S: filtered reads give only ${depth}x of the assembly; check read length in 01_nanoplot (DNA extraction?)"
+  return 0
 }
 
 # 05 QUAST — contiguity: number of contigs, total length, N50, GC% (draft = final: no polishing).  [S05]

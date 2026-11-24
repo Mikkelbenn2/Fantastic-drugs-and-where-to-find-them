@@ -256,6 +256,7 @@ All settings are in the block at the top of `bgc_pipeline.sh`. These are the mos
 | `THREADS` | 16 | You want more or fewer CPUs (inside Slurm it is taken from the job) |
 | `FLYE_READ_MODE` | `nano-hq` | Your reads are old R9.4.1 or fast-basecalled data: use `nano-raw` |
 | `GENOME_SIZE` | empty | You know it, e.g. `8m` for *Streptomyces* |
+| `FILTLONG_KEEP_PERCENT` | `""` | Off: every read ≥ `FILTLONG_MIN_LEN` (1 kb) is kept unless the 800 Mb cap applies. A fixed percentage (e.g. 95) also removes reads from isolates that have little data |
 | `FILTLONG_TARGET_BASES` | `800000000` | Keeps the best 800 Mb of reads (~100× of an 8 Mb genome); Flye fails with "No disjointigs" at ~1000×. Raise it for larger genomes, or set `""` to keep all reads |
 | `SHARED_GTDBTK_DB`, `SHARED_BAKTA_DB`, `SHARED_CHECKM2_DB`, `SHARED_ANTISMASH_DB` | AAU server: `/databases/...` | You are on another server: point them at its shared databases, or set `""` to let `setup` download them |
 | `RUN_GTDBTK`, `RUN_GTOTREE`, `RUN_GECCO`, `RUN_DEEPBGC`, `RUN_BGCPROPHET`, `RUN_RGI`, `RUN_BIGSCAPE` | 1 | You want to skip a program |
@@ -347,13 +348,13 @@ Check page numbers and DOIs against the original papers before they go into a re
 |---|---|
 | **Author** | Mikkel Bennetsen ([@Mikkelbenn2](https://github.com/Mikkelbenn2)), Aalborg University |
 | **Project** | P7 — AI-assisted genome mining for antimicrobial discovery in Tiny Earth soil isolates (2026) |
-| **Version** | 3.9.3 (last updated 2026-11-23) |
+| **Version** | 3.9.4 (last updated 2026-11-24) |
 | **License** | MIT (see `LICENSE`) |
 
 **AI assistance.** This pipeline was developed with help from Claude (Anthropic). It was used to draft and test the code, helped select and compare tools, and helped write the documentation. The author decided the design, reviewed the code, and tweaked the parameters.
 
 **How to cite this pipeline**
 
-> Bennetsen M. (2026). *bgc_pipeline.sh v3.9.3: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
+> Bennetsen M. (2026). *bgc_pipeline.sh v3.9.4: a Nanopore pipeline for screening soil isolates for novel biosynthetic gene clusters.* https://github.com/Mikkelbenn2/Fantastic-drugs-and-where-to-find-them
 
 Please also cite the individual programs it runs (listed above).
