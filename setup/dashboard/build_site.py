@@ -65,7 +65,7 @@ def bgcquast(mode):
 KEEP = {"# BGCs filtered by length", "# BGCs", "# unique BGCs", "Unique BGC rate", "Mean BGC length in bp",
         "Mean BGC length in genes", "Total BGC span in bp"}
 def flye_graphs(summary, isolates):
-    """Flye assembly_graph.gfa per isolate -> segments [name, length, depth, contig] and links [a, b]
+    """Flye assembly_graph.gfa per isolate -> segments [name, length, depth, contig] and links [a, +/-, b, +/-]
        (sequences are skipped, so the dashboard stays small)"""
     out, res = {}, os.path.abspath(os.path.join(summary, "..", ".."))
     for iso in isolates:
@@ -85,7 +85,7 @@ def flye_graphs(summary, isolates):
                     tags = dict(t.split(":", 2)[0::2] for t in f[3:] if t.count(":") >= 2)
                     seg.append([f[1], int(tags.get("LN", len(f[2]))), float(tags.get("dp", tags.get("DP", 0)) or 0), ctg.get(f[1], "")])
                 elif f[0] == "L":
-                    link.add(tuple(sorted((f[1], f[3]))))
+                    link.add((f[1], f[2], f[3], f[4]))   # from, +/-, to, +/- (which ends touch)
         if len(seg) <= 3000:   # shortcut: larger graphs (fragmented assemblies) are left out; raise if needed
             out[iso] = {"s": seg, "l": sorted(link)}
     return out

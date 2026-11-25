@@ -164,42 +164,70 @@ function plot(id, traces, layout = {}) {
     xaxis: {gridcolor: "#ecebe4", zeroline: false}, yaxis: {gridcolor: "#ecebe4", zeroline: false}, hoverlabel: {font: {size: 12}}
   }, layout), {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"]});
 }
-// Flye assembly graph: Fruchterman-Reingold layout (seeded, so it looks the same each time), drawn with plotly
+// Flye assembly graph drawn like Bandage: each segment is a thick line made of points (more points = longer
+// sequence), links join segment ends, so a circular contig closes into a ring. Seeded force layout.
 function graphPlot(id, G) {
   const el = document.getElementById(id);
   if (!G || !G.s.length) { el.style.height = "auto"; el.innerHTML = '<p class="muted">No assembly graph (not a Flye assembly, or more than 3,000 segments).</p>'; return; }
-  const n = G.s.length, idx = Object.fromEntries(G.s.map((s, i) => [s[0], i]));
-  const loops = new Set(G.l.filter(([a, b]) => a === b).map(([a]) => a));
-  const E = G.l.filter(([a, b]) => a !== b && a in idx && b in idx).map(([a, b]) => [idx[a], idx[b]]);
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const x = G.s.map(() => rnd()), y = G.s.map(() => rnd()), k = Math.sqrt(1 / n);
-  const iters = n > 600 ? 40 : n > 200 ? 120 : 300;
-  for (let it = 0, t = 0.1; it < iters; it++, t *= 0.97) {
+  const total = G.s.reduce((a, s) => a + s[1], 0), per = Math.max(total / 900, 1);
+  const first = [], last = [], seg = [], S = [];                 // point ranges per segment; springs [i, j, strength]
+  G.s.forEach((s, k) => { const m = Math.max(2, Math.round(s[1] / per)); first.push(seg.length);
+    for (let t = 0; t < m; t++) { if (t) S.push([seg.length - 1, seg.length, 1, 1]); if (t > 1) S.push([seg.length - 2, seg.length, 1, 2]); seg.push(k); }
+    last.push(seg.length - 1); });   // springs to the next point (rest 1) and the one after (rest 2) keep segments smooth
+  const idx = Object.fromEntries(G.s.map((s, k) => [s[0], k]));
+  const L = [];
+  for (const [a, ao, b, bo] of G.l) { if (!(a in idx) || !(b in idx)) continue;
+    const i = ao === "+" ? last[idx[a]] : first[idx[a]], j = bo === "+" ? first[idx[b]] : last[idx[b]];
+    if (i !== j) { S.push([i, j, 1, 1]); L.push([i, j]); } }
+  const n = seg.length, side = Math.sqrt(n) * 2;
+  let r = 7; const rnd = () => (r = (r * 16807) % 2147483647) / 2147483647;
+  const x = new Float64Array(n), y = new Float64Array(n);
+  const self = new Set(G.l.filter(([a, , b]) => a === b).map(([a]) => idx[a]));
+  // start layout: walk the links, so a linked segment starts at the end it is linked to (fewer crossings);
+  // circular segments start as a circle, others as a line
+  const nb = G.s.map(() => []), done = new Set();
+  for (const [i, j] of L) { nb[seg[i]].push([i, j]); nb[seg[j]].push([j, i]); }
+  const lay = (k, x0, y0, a, fromLast) => { const m = last[k] - first[k] + 1, R = m / 6.283; done.add(k);
+    for (let p = first[k]; p <= last[k]; p++) { const t = fromLast ? last[k] - p : p - first[k];
+      if (self.has(k)) { x[p] = x0 + R * Math.cos(t / R + a) - R * Math.cos(a); y[p] = y0 + R * Math.sin(t / R + a) - R * Math.sin(a); }
+      else { x[p] = x0 + Math.cos(a) * t; y[p] = y0 + Math.sin(a) * t; } } };
+  G.s.forEach((s, k0) => { if (done.has(k0)) return;
+    lay(k0, rnd() * side, rnd() * side, rnd() * 6.283, false);
+    const queue = [k0];
+    while (queue.length) { const k = queue.shift();
+      for (const [mine, other] of nb[k]) { const o = seg[other]; if (done.has(o)) continue;
+        lay(o, x[mine], y[mine], rnd() * 6.283, other === last[o]); queue.push(o); } } });
+  const iters = Math.max(40, Math.min(400, Math.round(2.5e8 / (n * n))));
+  for (let it = 0, temp = side / 10; it < iters; it++, temp *= 0.985) {
     const dx = new Float64Array(n), dy = new Float64Array(n);
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {        // repulsion
-      const ex = x[i] - x[j], ey = y[i] - y[j], d2 = ex * ex + ey * ey + 1e-9, f = k * k / d2;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {      // repulsion (k = 1)
+      const ex = x[i] - x[j], ey = y[i] - y[j], d2 = ex * ex + ey * ey + 1e-6;
+      if (d2 > 100 || (seg[i] === seg[j] && j - i < 25)) continue; const f = 1 / d2;   // near neighbours on a segment: springs only
       dx[i] += ex * f; dy[i] += ey * f; dx[j] -= ex * f; dy[j] -= ey * f; }
-    for (const [i, j] of E) {                                            // attraction along links
-      const ex = x[i] - x[j], ey = y[i] - y[j], d = Math.sqrt(ex * ex + ey * ey) + 1e-9, f = d / k;
+    for (const [i, j, w, rest] of S) {                                 // springs: along segments and across links
+      const ex = x[i] - x[j], ey = y[i] - y[j], d = Math.sqrt(ex * ex + ey * ey) + 1e-6, f = w * (d - rest) / d;
       dx[i] -= ex * f; dy[i] -= ey * f; dx[j] += ex * f; dy[j] += ey * f; }
-    for (let i = 0; i < n; i++) {                                        // gravity keeps loose pieces near
-      dx[i] -= (x[i] - 0.5) * 0.05 * n * k; dy[i] -= (y[i] - 0.5) * 0.05 * n * k;
-      const d = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]) + 1e-9, m = Math.min(d, t);
+    for (let i = 0; i < n; i++) {
+      const d = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]) + 1e-9, m = Math.min(d, temp);
       x[i] += dx[i] / d * m; y[i] += dy[i] / d * m; }
   }
-  const ex = [], ey = [];
-  for (const [i, j] of E) ex.push(x[i], x[j], null), ey.push(y[i], y[j], null);
-  const maxL = Math.max(...G.s.map(s => s[1])), ctgs = [...new Set(G.s.map(s => s[3]).filter(Boolean))];
-  const longest = {}; G.s.forEach((s, i) => { if (s[3] && !(s[3] in longest && G.s[longest[s[3]]][1] >= s[1])) longest[s[3]] = i; });
-  const col = s => s[3] ? PALETTE[ctgs.indexOf(s[3]) % PALETTE.length] : "#cfcfcf";
-  plot(id, [{type: "scatter", mode: "lines", x: ex, y: ey, line: {color: "#b9b7ad", width: 1}, hoverinfo: "skip", showlegend: false},
-    {type: "scatter", mode: ctgs.length <= 30 ? "markers+text" : "markers", x, y, showlegend: false,
-     textposition: "top center", textfont: {size: 11, color: "#1f2a2a"}, texttemplate: G.s.map((s, i) => s[3] && longest[s[3]] === i ? s[3] : ""),
-     marker: {size: G.s.map(s => 6 + 30 * Math.sqrt(s[1] / maxL)), color: G.s.map(col),
-              line: {color: G.s.map(s => loops.has(s[0]) ? "#1f2a2a" : "#fff"), width: G.s.map(s => loops.has(s[0]) ? 3 : 1)}},
+  const ctgs = [...new Set(G.s.map(s => s[3]).filter(Boolean))], groups = {};
+  G.s.forEach((s, k) => { const g = groups[s[3] || ""] ||= {x: [], y: []};
+    for (let p = first[k]; p <= last[k]; p++) { g.x.push(x[p]); g.y.push(y[p]); } g.x.push(null); g.y.push(null); });
+  const lx = [], ly = []; for (const [i, j] of L) lx.push(x[i], x[j], null), ly.push(y[i], y[j], null);
+  const mid = k => (first[k] + last[k]) >> 1, longest = {};
+  G.s.forEach((s, k) => { if (s[3] && !(s[3] in longest && G.s[longest[s[3]]][1] >= s[1])) longest[s[3]] = k; });
+  const loops = new Set(G.l.filter(([a, , b]) => a === b).map(([a]) => a));
+  plot(id, [
+    ...Object.entries(groups).map(([c, g]) => ({type: "scatter", mode: "lines", x: g.x, y: g.y, name: c || "not in a contig", hoverinfo: "skip",
+      line: {color: c ? PALETTE[ctgs.indexOf(c) % PALETTE.length] : "#cfcfcf", width: 7}, showlegend: false})),
+    {type: "scatter", mode: "lines", x: lx, y: ly, line: {color: "#1f2a2a", width: 1.5}, hoverinfo: "skip", showlegend: false},
+    {type: "scatter", mode: "markers+text", x: G.s.map((s, k) => x[mid(k)]), y: G.s.map((s, k) => y[mid(k)]), showlegend: false,
+     marker: {size: 14, opacity: 0}, textposition: "top center", textfont: {size: 11, color: "#1f2a2a"},
+     texttemplate: G.s.map((s, k) => ctgs.length <= 30 && s[3] && longest[s[3]] === k ? s[3] : ""),
      text: G.s.map(s => `${s[0]}: ${fmt(s[1] / 1e3, 1)} kb, depth ${fmt(s[2], 0)}×<br>${s[3] ? "in " + s[3] : "not in a contig"}${loops.has(s[0]) ? " · circular" : ""}`),
      hovertemplate: "%{text}<extra></extra>"}],
-    {xaxis: {visible: false}, yaxis: {visible: false, scaleanchor: "x"}, margin: {l: 10, r: 10, t: 10, b: 10}, height: 460});
+    {xaxis: {visible: false}, yaxis: {visible: false, scaleanchor: "x"}, margin: {l: 10, r: 10, t: 10, b: 10}, height: 460, hovermode: "closest"});
 }
 function groupedScatter(id, gs, x, y, xl, yl, extra = {}) {
   const grp = by(gs.map(g => ({...g, _g: group(g.isolate)})), "_g");
@@ -449,7 +477,7 @@ P.isolate = arg => {
        "ANI": fmt(g.closest_ANI, 2) + " %", "N50": fmt(sc(g.N50, 1e3), 0) + " kb", "GC": fmt(g.GC_percent, 1) + " %", "depth": fmt(g.mean_depth) + "×",
        "CDS / tRNA / rRNA": `${fmt(g.CDS)} / ${fmt(g.tRNA)} / ${fmt(g.rRNA)}`, "BGCs per tool": `antiSMASH ${na(g.BGCs_antismash)}, GECCO ${na(g.BGCs_gecco)}, DeepBGC ${na(g.BGCs_deepbgc)}, BGC-Prophet ${na(g.BGCs_bgc_prophet)}`})) +
   `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div><p id="pmapnote" class="muted"></p>', "wide") +
-  `<div style="height:18px"></div>` + card("Assembly graph (Flye)", '<div id="pgraph" class="plot" style="height:460px"></div><p class="muted">Each dot is a graph segment (size = length, colour = the contig it ends up in, ring = joins to itself, i.e. circular); lines are links between segments. Contigs that share links were split at a repeat the reads could not span. Drag to zoom, double-click to reset.</p>', "wide") +
+  `<div style="height:18px"></div>` + card("Assembly graph (Flye)", '<div id="pgraph" class="plot" style="height:460px"></div><p class="muted">Drawn like Bandage: each thick line is a graph segment (length ∝ sequence length, colour = the contig it ends up in); thin black lines join linked segment ends. A closed ring is a circular contig; contigs that meet at a short shared segment were split at a repeat the reads could not span. Hover the middle of a segment for details. Drag to zoom, double-click to reset.</p>', "wide") +
   `<div style="height:18px"></div>` + card("BGC loci of this isolate", '<div id="tiso"></div>', "wide") +
   `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div><p class="muted">Mutation and overexpression models (intrinsic resistome) are left out; see RGI_EXCLUDE_MODELS. A gene inside a BGC locus suggests self-resistance.</p>')}
    ${card("Read length and quality (first 5,000 reads)", '<div id="pl1" class="plot" style="height:250px"></div><div id="pq1" class="plot" style="height:250px"></div>')}</div>`;
