@@ -15,6 +15,8 @@ ap.add_argument("--out")
 ap.add_argument("--project", help="folder with metadata.tsv (default: 3 levels above summary)")
 ap.add_argument("--title", default="BGC screening of soil isolates")
 ap.add_argument("--pipeline-version", default="")
+ap.add_argument("--add", action="append", default=[], metavar="SUMMARY",
+                help="another results/_combined/summary to merge in (e.g. split genomes); repeatable")
 a = ap.parse_args()
 summ = os.path.abspath(a.summary)
 project = os.path.abspath(a.project or os.path.join(summ, "..", "..", ".."))
@@ -32,6 +34,8 @@ def rows(*parts):
 if not os.path.isfile(os.path.join(summ, "master_summary.tsv")):
     sys.exit(f"ERROR: no master_summary.tsv in {summ}: run the pipeline's combined/summary step first")
 genomes = rows(summ, "genome_summary.tsv")
+for extra in a.add:   # merged results (isolate, BGC, contig, read and resistance tables)
+    genomes += rows(extra, "genome_summary.tsv")
 names = {g["isolate"] for g in genomes}
 # sample metadata: your metadata.tsv (first column = isolate) + the control panel, only isolates in this run
 meta = {}
@@ -89,6 +93,23 @@ def plotly_js():
             return "<script>" + open(p).read().replace("</script", "<\\/script") + "</script>", p
     return '<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>', "jsdelivr (online)"
 
+
+for extra in a.add:
+    if not os.path.isfile(os.path.join(extra, "master_summary.tsv")):
+        sys.exit(f"ERROR: no master_summary.tsv in {extra}")
+    data["master"] += rows(extra, "master_summary.tsv"); data["contigs"] += rows(extra, "contigs.tsv")
+    data["reads"] += [[r["isolate"], int(r["length"]), float(r["meanQ"])] for r in rows(extra, "reads_sample.tsv")]
+    data["resistance"] += rows(extra, "resistance_genes.tsv")
+    data["source"] += " + " + os.path.abspath(extra)
+if a.add:   # one ranking over all merged loci, same order as the summary step
+    def f(r, k):
+        try:
+            return float(r[k])
+        except (KeyError, TypeError, ValueError):
+            return 0.0
+    data["master"].sort(key=lambda r: (-f(r, "priority_score"), -f(r, "n_tools"), -f(r, "length_kb")))
+    for i, r in enumerate(data["master"], start=1):
+        r["rank"] = str(i)
 
 js, js_from = plotly_js()
 html = open(os.path.join(here, "site_template.html")).read()

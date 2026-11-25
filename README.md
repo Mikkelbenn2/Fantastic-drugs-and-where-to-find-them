@@ -83,6 +83,7 @@ scp ml12pe@student.aau.dk@bio-fe01.srv.aau.dk:/projects/students/bio-26-BT-7-1/F
 - The charts use plotly.js. The builder puts it inside the file when it finds R's plotly package (e.g. the `dashboard` env made by `setup`), so the file also works offline. Otherwise the file loads plotly.js from the internet.
 - The run details come from the first read header. Reads downloaded from SRA/ENA have no such header, so those fields show "–".
 - Build without the pipeline: `python3 setup/dashboard/build_site.py <summary folder> --project <project folder>` (python3 only).
+- Merge other results into one dashboard (e.g. split genomes of a mixed culture): add `--add <other summary folder>` (repeatable). Loci are re-ranked over all merged isolates.
 - The older interactive Shiny app still exists. It needs a running R session on a compute node: `bash setup/bgc_pipeline.sh dashboard-live` (see `setup/dashboard/app.R`). Report figures of the controls: `Rscript setup/controls/plot_controls.R <summary folder>`.
 
 ---

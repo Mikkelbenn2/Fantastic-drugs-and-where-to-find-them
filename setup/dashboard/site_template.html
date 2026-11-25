@@ -157,6 +157,7 @@ function table(el, rows, cols, opt = {}) {
 // ---------- charts ----------
 function plot(id, traces, layout = {}) {
   if (!window.Plotly) { document.getElementById(id).innerHTML = '<p class="muted">Charts need internet (plotly.js from cdnjs).</p>'; return; }
+  if (layout.height) document.getElementById(id).style.height = layout.height + "px";   // else the CSS 340 px box cuts it off
   Plotly.newPlot(id, traces, Object.assign({
     margin: {l: 60, r: 16, t: 30, b: 50}, font: {family: "IBM Plex Sans, sans-serif", size: 12, color: "#1f2a2a"},
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", legend: {orientation: "h", x: 0, y: 1.02, yanchor: "bottom"},
@@ -410,7 +411,7 @@ P.isolate = arg => {
   card("Genome and taxonomy", kv({"GTDB": `<span class="muted">${esc(na(g.gtdb_classification)).replace(/;/g, "; ")}</span>`, "closest reference": ncbiLink(g.closest_reference),
        "ANI": fmt(g.closest_ANI, 2) + " %", "N50": fmt(sc(g.N50, 1e3), 0) + " kb", "GC": fmt(g.GC_percent, 1) + " %", "depth": fmt(g.mean_depth) + "×",
        "CDS / tRNA / rRNA": `${fmt(g.CDS)} / ${fmt(g.tRNA)} / ${fmt(g.rRNA)}`, "BGCs per tool": `antiSMASH ${na(g.BGCs_antismash)}, GECCO ${na(g.BGCs_gecco)}, DeepBGC ${na(g.BGCs_deepbgc)}, BGC-Prophet ${na(g.BGCs_bgc_prophet)}`})) +
-  `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div>', "wide") +
+  `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div><p id="pmapnote" class="muted"></p>', "wide") +
   `<div style="height:18px"></div>` + card("BGC loci of this isolate", '<div id="tiso"></div>', "wide") +
   `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div><p class="muted">Mutation and overexpression models (intrinsic resistome) are left out; see RGI_EXCLUDE_MODELS. A gene inside a BGC locus suggests self-resistance.</p>')}
    ${card("Read length and quality (first 5,000 reads)", '<div id="pl1" class="plot" style="height:250px"></div><div id="pq1" class="plot" style="height:250px"></div>')}</div>`;
@@ -420,9 +421,15 @@ P.isolate.after = arg => {
   if (!iso) return;
   document.getElementById("isosel").onchange = e => location.hash = "isolate/" + encodeURIComponent(e.target.value);
   const L = LOCI[iso] || [], res = (D.resistance || []).filter(r => r.isolate === iso);
-  let ctg = D.contigs.filter(c => c.isolate === iso).slice(0, 25);
-  if (!ctg.length) ctg = [...new Set(L.map(r => r.contig))].map(c => ({contig: c, length: Math.max(...L.filter(r => r.contig === c).map(r => num(r.end)))}));
+  // every contig with a BGC locus or resistance gene, plus the rest when there are 25 or fewer; longest first
+  const all = D.contigs.filter(c => c.isolate === iso).sort((a, b) => num(b.length) - num(a.length));
+  const hit = new Set([...L, ...res].map(r => r.contig));
+  let ctg = all.length <= 25 ? all : all.filter(c => hit.has(c.contig));
+  if (!ctg.length) ctg = [...hit].map(c => ({contig: c, length: Math.max(...[...L, ...res].filter(r => r.contig === c).map(r => num(r.end)))}));
   const names = ctg.map(c => c.contig), show = new Set(names);
+  const hidden = all.length - ctg.length;
+  document.getElementById("pmapnote").textContent = hidden > 0 ?
+    `${names.length} of ${all.length} contigs shown (those with a BGC locus or resistance gene); ${hidden} contigs without either are left out.` : "";
   const tr = [{type: "bar", orientation: "h", name: "contig", y: names, x: ctg.map(c => num(c.length) / 1e6), base: 0, width: 0.25,
     marker: {color: "#d9d7cd"}, hovertemplate: "%{y}: %{x:.2f} Mb<extra></extra>"}];
   for (const n of NOV) { const rs = L.filter(r => r.novelty === n && show.has(r.contig)); if (!rs.length) continue;
@@ -434,7 +441,7 @@ P.isolate.after = arg => {
   if (rr.length) tr.push({type: "scatter", mode: "markers", name: "resistance gene", y: rr.map(r => r.contig), x: rr.map(r => num(r.start) / 1e6),
     marker: {symbol: "triangle-down", size: 11, color: "#1f2a2a"}, text: rr.map(r => `${r.gene} (${r.drug})`), hovertemplate: "%{text}<extra></extra>", yaxis: "y"});
   plot("pmap", tr, {barmode: "overlay", xaxis: {title: "position (Mb)", gridcolor: "#ecebe4"}, yaxis: {automargin: true, autorange: "reversed", type: "category"},
-    margin: {l: 10, r: 16, t: 10, b: 50}, height: Math.max(220, 46 * names.length + 100)});
+    margin: {l: 10, r: 16, t: 10, b: 50}, height: Math.max(220, (names.length > 12 ? 24 : 46) * names.length + 100)});
   table("tiso", L, bgcCols(false), {name: iso + "_loci"});
   table("tres", res, [{l: "gene", k: "gene"}, {l: "drug class", k: "drug"}, {l: "mechanism", k: "mechanism"}, {l: "identity %", k: "identity", n: 1, d: 1},
     {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1},
