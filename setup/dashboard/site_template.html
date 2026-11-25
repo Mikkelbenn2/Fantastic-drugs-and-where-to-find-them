@@ -164,6 +164,43 @@ function plot(id, traces, layout = {}) {
     xaxis: {gridcolor: "#ecebe4", zeroline: false}, yaxis: {gridcolor: "#ecebe4", zeroline: false}, hoverlabel: {font: {size: 12}}
   }, layout), {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"]});
 }
+// Flye assembly graph: Fruchterman-Reingold layout (seeded, so it looks the same each time), drawn with plotly
+function graphPlot(id, G) {
+  const el = document.getElementById(id);
+  if (!G || !G.s.length) { el.style.height = "auto"; el.innerHTML = '<p class="muted">No assembly graph (not a Flye assembly, or more than 3,000 segments).</p>'; return; }
+  const n = G.s.length, idx = Object.fromEntries(G.s.map((s, i) => [s[0], i]));
+  const loops = new Set(G.l.filter(([a, b]) => a === b).map(([a]) => a));
+  const E = G.l.filter(([a, b]) => a !== b && a in idx && b in idx).map(([a, b]) => [idx[a], idx[b]]);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const x = G.s.map(() => rnd()), y = G.s.map(() => rnd()), k = Math.sqrt(1 / n);
+  const iters = n > 600 ? 40 : n > 200 ? 120 : 300;
+  for (let it = 0, t = 0.1; it < iters; it++, t *= 0.97) {
+    const dx = new Float64Array(n), dy = new Float64Array(n);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {        // repulsion
+      const ex = x[i] - x[j], ey = y[i] - y[j], d2 = ex * ex + ey * ey + 1e-9, f = k * k / d2;
+      dx[i] += ex * f; dy[i] += ey * f; dx[j] -= ex * f; dy[j] -= ey * f; }
+    for (const [i, j] of E) {                                            // attraction along links
+      const ex = x[i] - x[j], ey = y[i] - y[j], d = Math.sqrt(ex * ex + ey * ey) + 1e-9, f = d / k;
+      dx[i] -= ex * f; dy[i] -= ey * f; dx[j] += ex * f; dy[j] += ey * f; }
+    for (let i = 0; i < n; i++) {                                        // gravity keeps loose pieces near
+      dx[i] -= (x[i] - 0.5) * 0.05 * n * k; dy[i] -= (y[i] - 0.5) * 0.05 * n * k;
+      const d = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]) + 1e-9, m = Math.min(d, t);
+      x[i] += dx[i] / d * m; y[i] += dy[i] / d * m; }
+  }
+  const ex = [], ey = [];
+  for (const [i, j] of E) ex.push(x[i], x[j], null), ey.push(y[i], y[j], null);
+  const maxL = Math.max(...G.s.map(s => s[1])), ctgs = [...new Set(G.s.map(s => s[3]).filter(Boolean))];
+  const longest = {}; G.s.forEach((s, i) => { if (s[3] && !(s[3] in longest && G.s[longest[s[3]]][1] >= s[1])) longest[s[3]] = i; });
+  const col = s => s[3] ? PALETTE[ctgs.indexOf(s[3]) % PALETTE.length] : "#cfcfcf";
+  plot(id, [{type: "scatter", mode: "lines", x: ex, y: ey, line: {color: "#b9b7ad", width: 1}, hoverinfo: "skip", showlegend: false},
+    {type: "scatter", mode: ctgs.length <= 30 ? "markers+text" : "markers", x, y, showlegend: false,
+     textposition: "top center", textfont: {size: 11, color: "#1f2a2a"}, texttemplate: G.s.map((s, i) => s[3] && longest[s[3]] === i ? s[3] : ""),
+     marker: {size: G.s.map(s => 6 + 30 * Math.sqrt(s[1] / maxL)), color: G.s.map(col),
+              line: {color: G.s.map(s => loops.has(s[0]) ? "#1f2a2a" : "#fff"), width: G.s.map(s => loops.has(s[0]) ? 3 : 1)}},
+     text: G.s.map(s => `${s[0]}: ${fmt(s[1] / 1e3, 1)} kb, depth ${fmt(s[2], 0)}×<br>${s[3] ? "in " + s[3] : "not in a contig"}${loops.has(s[0]) ? " · circular" : ""}`),
+     hovertemplate: "%{text}<extra></extra>"}],
+    {xaxis: {visible: false}, yaxis: {visible: false, scaleanchor: "x"}, margin: {l: 10, r: 10, t: 10, b: 10}, height: 460});
+}
 function groupedScatter(id, gs, x, y, xl, yl, extra = {}) {
   const grp = by(gs.map(g => ({...g, _g: group(g.isolate)})), "_g");
   plot(id, Object.keys(grp).map((k, i) => ({type: "scatter", mode: "markers", name: k,
@@ -412,6 +449,7 @@ P.isolate = arg => {
        "ANI": fmt(g.closest_ANI, 2) + " %", "N50": fmt(sc(g.N50, 1e3), 0) + " kb", "GC": fmt(g.GC_percent, 1) + " %", "depth": fmt(g.mean_depth) + "×",
        "CDS / tRNA / rRNA": `${fmt(g.CDS)} / ${fmt(g.tRNA)} / ${fmt(g.rRNA)}`, "BGCs per tool": `antiSMASH ${na(g.BGCs_antismash)}, GECCO ${na(g.BGCs_gecco)}, DeepBGC ${na(g.BGCs_deepbgc)}, BGC-Prophet ${na(g.BGCs_bgc_prophet)}`})) +
   `</div>` + card("Genome map: BGC loci and resistance genes on each contig", '<div id="pmap" class="plot"></div><p id="pmapnote" class="muted"></p>', "wide") +
+  `<div style="height:18px"></div>` + card("Assembly graph (Flye)", '<div id="pgraph" class="plot" style="height:460px"></div><p class="muted">Each dot is a graph segment (size = length, colour = the contig it ends up in, ring = joins to itself, i.e. circular); lines are links between segments. Contigs that share links were split at a repeat the reads could not span. Drag to zoom, double-click to reset.</p>', "wide") +
   `<div style="height:18px"></div>` + card("BGC loci of this isolate", '<div id="tiso"></div>', "wide") +
   `<div class="grid" style="margin-top:18px">${card("Resistance genes (RGI/CARD)", '<div id="tres"></div><p class="muted">Mutation and overexpression models (intrinsic resistome) are left out; see RGI_EXCLUDE_MODELS. A gene inside a BGC locus suggests self-resistance.</p>')}
    ${card("Read length and quality (first 5,000 reads)", '<div id="pl1" class="plot" style="height:250px"></div><div id="pq1" class="plot" style="height:250px"></div>')}</div>`;
@@ -447,6 +485,7 @@ P.isolate.after = arg => {
     {l: "contig", k: "contig"}, {l: "start", k: "start", n: 1},
     {l: "in BGC locus", v: r => L.filter(x => x.contig === r.contig && num(x.start) <= num(r.end) && num(r.start) <= num(x.end)).map(x => x.locus_id).join(", ") || "no"}], {name: iso + "_resistance"});
   readHists("pl1", "pq1", [iso]);
+  graphPlot("pgraph", (D.graphs || {})[iso]);
 };
 
 P.controls = () => head("Controls", "Positive and negative controls",

@@ -64,6 +64,33 @@ def bgcquast(mode):
 
 KEEP = {"# BGCs filtered by length", "# BGCs", "# unique BGCs", "Unique BGC rate", "Mean BGC length in bp",
         "Mean BGC length in genes", "Total BGC span in bp"}
+def flye_graphs(summary, isolates):
+    """Flye assembly_graph.gfa per isolate -> segments [name, length, depth, contig] and links [a, b]
+       (sequences are skipped, so the dashboard stays small)"""
+    out, res = {}, os.path.abspath(os.path.join(summary, "..", ".."))
+    for iso in isolates:
+        gfa = os.path.join(res, iso, "03_flye", "assembly_graph.gfa")
+        if not os.path.isfile(gfa):
+            continue
+        ctg = {}
+        for r in rows(res, iso, "03_flye", "assembly_info.txt"):   # graph_path "-5,*,12" -> edge_5, edge_12
+            for e in (r.get("graph_path") or "").split(","):
+                if e.strip("-+*"):
+                    ctg.setdefault("edge_" + e.strip("-+"), r.get("#seq_name", ""))
+        seg, link = [], set()
+        with open(gfa) as fh:
+            for line in fh:
+                f = line.rstrip("\n").split("\t")
+                if f[0] == "S":
+                    tags = dict(t.split(":", 2)[0::2] for t in f[3:] if t.count(":") >= 2)
+                    seg.append([f[1], int(tags.get("LN", len(f[2]))), float(tags.get("dp", tags.get("DP", 0)) or 0), ctg.get(f[1], "")])
+                elif f[0] == "L":
+                    link.add(tuple(sorted((f[1], f[3]))))
+        if len(seg) <= 3000:   # shortcut: larger graphs (fragmented assemblies) are left out; raise if needed
+            out[iso] = {"s": seg, "l": sorted(link)}
+    return out
+
+
 versions = rows(summ, "software_versions.tsv") or rows(summ, "..", "..", "software_versions.tsv")
 
 data = {
@@ -72,7 +99,7 @@ data = {
     "genomes": genomes, "master": rows(summ, "master_summary.tsv"), "contigs": rows(summ, "contigs.tsv"),
     "reads": [[r["isolate"], int(r["length"]), float(r["meanQ"])] for r in rows(summ, "reads_sample.tsv")],
     "resistance": rows(summ, "resistance_genes.tsv"), "settings": rows(summ, "settings.tsv"),
-    "versions": versions, "metadata": meta,
+    "versions": versions, "metadata": meta, "graphs": flye_graphs(summ, names),
     "bgcquast": {"tools": bgcquast("compare_tools"), "samples": bgcquast("compare_samples")},
     "controls": {"recovery": rows(summ, "controls_recovery.tsv"), "loci": rows(summ, "controls_loci.tsv"),
                  "expected": rows(summ, "controls_expected_bgcs.tsv"),
@@ -100,6 +127,7 @@ for extra in a.add:
     data["master"] += rows(extra, "master_summary.tsv"); data["contigs"] += rows(extra, "contigs.tsv")
     data["reads"] += [[r["isolate"], int(r["length"]), float(r["meanQ"])] for r in rows(extra, "reads_sample.tsv")]
     data["resistance"] += rows(extra, "resistance_genes.tsv")
+    data["graphs"].update(flye_graphs(extra, {g["isolate"] for g in rows(extra, "genome_summary.tsv")}))
     data["source"] += " + " + os.path.abspath(extra)
 if a.add:   # one ranking over all merged loci, same order as the summary step
     def f(r, k):
