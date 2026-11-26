@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-off tidy-up of the BioCloud project folder for pipeline v3.8 (numbered folders, all code in setup/).
+# One-off tidy-up of the BioCloud project folder for pipeline v3.8 (numbered folders, all code in setup/),
+# and (v3.9.5) all isolate results inside 3_results/: split/, meta/, meta_assembly/, tree/.
 #   bash setup/tidy_project.sh        shows what would be moved (changes nothing)
 #   bash setup/tidy_project.sh --do   moves it
 # Only MOVES (mv -n: never overwrites); nothing is deleted. Old and unused things go to 0_junk_yard/,
@@ -44,6 +45,12 @@ move "raw_data"           "1_raw_data"
 move "raw_data_controls"  "2_raw_data_controls"
 move "results"            "3_results"
 move "results_controls"   "4_results_controls"
+echo "== isolate results that were next to 3_results (split, metagenome bins, tree, loose job logs)"
+move "3_results_split"    "3_results/split"
+move "3_results_meta"     "3_results/meta"
+move "meta_ISO5-1"        "3_results/meta_assembly"
+move "tree_isolates"      "3_results/tree"
+for f in slurm-*.out; do move "$f" "3_results/slurm_logs/$f"; done
 
 [[ $DO -eq 1 ]] || { echo "Nothing changed. To do it:  bash setup/tidy_project.sh --do"; exit 0; }
 
@@ -53,13 +60,17 @@ n=0
 while IFS= read -r l; do
   t=$(readlink "$l"); new=$t
   for pair in "raw_data_controls/:2_raw_data_controls/" "raw_data/:1_raw_data/" \
-              "results_controls/:4_results_controls/" "results/:3_results/"; do
+              "results_controls/:4_results_controls/" "results/:3_results/" \
+              "3_results_split/:3_results/split/" "3_results_meta/:3_results/meta/" \
+              "meta_ISO5-1/:3_results/meta_assembly/" "tree_isolates/:3_results/tree/"; do
     old=${pair%%:*}; nw=${pair##*:}
     [[ "$new" == "$P/$old"* ]] && { new="$P/$nw${new#"$P/$old"}"; break; }
   done
   [[ "$new" != "$t" ]] && { ln -sfn "$new" "$l"; n=$((n + 1)); }
 done < <(find 3_results 4_results_controls -type l 2>/dev/null)
 echo "  $n links updated"
+b=$( (find -L 3_results 4_results_controls -type l 2>/dev/null || true) | wc -l)
+[[ $b -eq 0 ]] || { echo "  WARNING: $b broken links, e.g.:"; find -L 3_results 4_results_controls -type l 2>/dev/null | head -5; }
 
 echo "== dashboards"
 bash setup/bgc_pipeline.sh dashboard || true

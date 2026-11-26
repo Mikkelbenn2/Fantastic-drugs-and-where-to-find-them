@@ -125,13 +125,17 @@ Numbered folders are the ones you open (data, results, dashboards). All program 
 | `1_raw_data/` | your reads or genomes, one per isolate |
 | `2_raw_data_controls/` | the control genomes and reads (downloaded by `controls`) |
 | `3_results/` | everything the pipeline makes for your isolates |
+| `3_results/split/` | a mixed culture split into its genomes (e.g. ISO1-2_A/B), run with `BGC_RESULTS_DIR=$PWD/3_results/split` |
+| `3_results/meta/` | the metagenome bins of a mixed culture (ISO5-1), run with `BGC_RESULTS_DIR=$PWD/3_results/meta` |
+| `3_results/meta_assembly/` | the metagenome assembly and binning that made those bins |
+| `3_results/tree/` | phylogenetic tree of all genomes above (`sbatch setup/tree_isolates.sh`) |
 | `4_results_controls/` | the same for the controls |
 | `5_dashboards/` | `dashboard_isolates.html` and `dashboard_controls.html`: open or share these |
 | `setup/` | all program code: the pipeline script, its programs (`envs/`) and databases |
 | `setup/controls/` | control panel, expected BGCs, checker, evaluation, figures script |
 | `setup/dashboard/` | the code that builds the dashboards |
 
-Older project folders (v3.7 and before: `raw_data/`, `results/` …): run `bash setup/tidy_project.sh` once to see the moves, then `bash setup/tidy_project.sh --do`. It only moves (never deletes) and refuses to run while pipeline jobs are running.
+Older project folders (v3.7 and before: `raw_data/`, `results/` …, or `3_results_split/`, `3_results_meta/`, `meta_ISO5-1/`, `tree_isolates/` next to `3_results/`): run `bash setup/tidy_project.sh` once to see the moves, then `bash setup/tidy_project.sh --do`. It only moves (never deletes) and refuses to run while pipeline jobs are running.
 
 ```
 Fantastic-drugs-and-where-to-find-them/
@@ -160,6 +164,8 @@ Fantastic-drugs-and-where-to-find-them/
     │                             genome_summary.tsv, bgc_summary.tsv (antiSMASH-only ranking, as before)
     │                             dashboard.html  ← all results in one file, to open or share
     │                             contigs.tsv, reads_sample.tsv, resistance_genes.tsv, settings.tsv (for the dashboard)
+    ├── split/  meta/             the same layout for split genomes and metagenome bins
+    ├── meta_assembly/  tree/
     ├── slurm_logs/
     └── software_versions.tsv     exact version of every program (for your Methods)
 ```
